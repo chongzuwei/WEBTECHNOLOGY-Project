@@ -1,24 +1,28 @@
 <template>
   <div>
     <h1>Login</h1>
-    <form @submit.prevent="submit">
-      <div>
-        <label>Email</label><br/>
-        <input v-model.trim="email" />
+    <form @submit.prevent="submit" class="auth-form">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" v-model.trim="email" />
+        <div v-if="emailError" class="field-error">{{ emailError }}</div>
       </div>
-      <div>
-        <label>Password</label><br/>
-        <input type="password" v-model="password" />
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input id="password" type="password" v-model="password" />
+        <div v-if="passwordError" class="field-error">{{ passwordError }}</div>
       </div>
+
       <div v-if="error" class="error">{{ error }}</div>
-      <button type="submit">Login</button>
+      <button type="submit" :disabled="submitting">Login</button>
     </form>
   </div>
 </template>
 
 <script>
 import auth from '@/services/auth'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 export default {
@@ -26,23 +30,43 @@ export default {
     const email = ref('')
     const password = ref('')
     const error = ref('')
+    const emailError = ref('')
+    const passwordError = ref('')
+    const submitting = ref(false)
     const router = useRouter()
     const route = useRoute()
 
+    function validate(){
+      emailError.value = ''
+      passwordError.value = ''
+      const emailRe = /^\S+@\S+\.\S+$/
+      if(!email.value) emailError.value = 'Email is required'
+      else if(!emailRe.test(email.value)) emailError.value = 'Email is invalid'
+      if(!password.value) passwordError.value = 'Password is required'
+      return !emailError.value && !passwordError.value
+    }
+
     async function submit(){
       error.value = ''
+      if(!validate()) return
+      submitting.value = true
       try{
         auth.login({ email: email.value, password: password.value })
         const redirect = route.query.redirect || '/'
         router.push(redirect)
       }catch(err){ error.value = err.message }
+      finally{ submitting.value = false }
     }
 
-    return { email, password, submit, error }
+    return { email, password, submit, error, emailError, passwordError, submitting }
   }
 }
 </script>
 
 <style scoped>
 .error{ color: red }
+.auth-form{ max-width:420px }
+.form-group{ display:flex; flex-direction:column; margin-bottom:10px }
+.field-error{ color:#b00020; font-size:0.9rem; margin-top:6px }
+button[disabled]{ opacity:0.6 }
 </style>

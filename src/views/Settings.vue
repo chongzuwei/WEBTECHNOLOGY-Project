@@ -3,29 +3,40 @@
     <h1>Manage Setting</h1>
     <div v-if="!user">No user found.</div>
     <div v-else>
-      <label>Name</label><br/>
-      <input v-model="name" />
-      <div style="margin-top:8px">
-        <label>Email</label><br/>
-        <input v-model="email" />
-      </div>
+      <form class="settings-form" @submit.prevent="save">
+        <div class="form-group">
+          <label for="name">Name</label>
+          <input id="name" v-model="name" />
+        </div>
 
-      <fieldset style="margin-top:12px">
-        <legend>Change password</legend>
-        <label>Current password</label><br/>
-        <input type="password" v-model="currentPassword" />
-        <label style="margin-top:6px">New password</label><br/>
-        <input type="password" v-model="newPassword" />
-        <label style="margin-top:6px">Confirm new password</label><br/>
-        <input type="password" v-model="confirm" />
-      </fieldset>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input id="email" v-model="email" />
+        </div>
 
-      <div style="margin-top:10px">
-        <button @click="save">Save</button>
-      </div>
+        <fieldset class="pass-fieldset">
+          <legend>Change password</legend>
+          <div class="form-group">
+            <label for="currentPassword">Current password</label>
+            <input id="currentPassword" type="password" v-model="currentPassword" />
+          </div>
+          <div class="form-group">
+            <label for="newPassword">New password</label>
+            <input id="newPassword" type="password" v-model="newPassword" />
+          </div>
+          <div class="form-group">
+            <label for="confirm">Confirm new password</label>
+            <input id="confirm" type="password" v-model="confirm" />
+          </div>
+        </fieldset>
 
-      <div v-if="msg" class="msg">{{ msg }}</div>
-      <div v-if="error" class="error">{{ error }}</div>
+        <div class="actions">
+          <button type="submit">Save</button>
+        </div>
+
+        <p v-if="msg" class="msg">{{ msg }}</p>
+        <p v-if="error" class="error">{{ error }}</p>
+      </form>
     </div>
   </div>
 </template>
@@ -74,6 +85,14 @@ export default {
 </script>
 
 <style scoped>
+.settings-form{ max-width:480px }
+.form-group{ display:flex; flex-direction:column; margin-bottom:10px }
+.form-group label{ font-weight:600; margin-bottom:6px }
+.form-group input{ padding:8px 10px; border:1px solid #ccc; border-radius:4px }
+.pass-fieldset{ border:1px solid #ddd; padding:12px; border-radius:6px }
+.pass-fieldset legend{ padding:0 6px }
+.actions{ margin-top:12px }
+.actions button{ padding:8px 14px; border-radius:4px; background:#2c3e50; color:#fff; border:none }
 .msg{color:green;margin-top:8px}
 .error{color:red;margin-top:8px}
 </style>
