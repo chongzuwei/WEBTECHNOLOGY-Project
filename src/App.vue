@@ -1,9 +1,7 @@
 <template>
-  <div id="app">
+  <div id="app" class="app-container">
     <NavBar />
-    <main class="container">
-      <router-view />
-    </main>
+    <router-view />
   </div>
 </template>
 
@@ -15,9 +13,10 @@ export default {
 </script>
 
 <style>
-body { font-family: Arial, sans-serif; margin:0; padding:0; }
-.container { padding: 1rem; }
-nav { background:#2c3e50; color:#fff; padding:1rem; }
-nav a { color:#fff; margin-right:1rem; text-decoration:none; }
-nav a.router-link-active { font-weight:bold; text-decoration:underline; }
+/* App-wide container heights */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 </style>

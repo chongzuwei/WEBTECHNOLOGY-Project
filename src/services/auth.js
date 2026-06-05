@@ -2,15 +2,39 @@ const STORAGE_USERS_KEY = 'wt_users'
 const STORAGE_SESSION_KEY = 'wt_session'
 
 function loadUsers(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]') }catch{ return [] }
+  try{
+    let users = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]')
+    if (users.length === 0) {
+      users = [
+        { id: 12, name: 'Alex Chen', email: 'alex.chen@example.com', password: 'password', role: 'student' },
+        { id: 13, name: 'Ms. Nadia', email: 'admin@maxcv.com', password: 'password', role: 'admin' }
+      ]
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users))
+    }
+    return users
+  }catch{ return [] }
 }
 function saveUsers(users){ localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users)) }
 
 function getSession(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_SESSION_KEY) || 'null') }catch{ return null }
+  try{
+    let session = JSON.parse(localStorage.getItem(STORAGE_SESSION_KEY) || 'null')
+    if (!session && localStorage.getItem('maxcv_logged_out') !== 'true') {
+      // Seed initial session for demo, unless they explicitly logged out
+      session = { userId: 12, token: 'fake-jwt-12' }
+      localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session))
+    }
+    return session
+  }catch{ return null }
 }
-function setSession(session){ localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session)) }
-function clearSession(){ localStorage.removeItem(STORAGE_SESSION_KEY) }
+function setSession(session){
+  localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session))
+  localStorage.removeItem('maxcv_logged_out')
+}
+function clearSession(){
+  localStorage.removeItem(STORAGE_SESSION_KEY)
+  localStorage.setItem('maxcv_logged_out', 'true')
+}
 
 export default {
   register({ name, email, password }){
