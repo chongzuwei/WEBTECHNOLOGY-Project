@@ -94,5 +94,57 @@ export default {
     window.dispatchEvent(new CustomEvent('auth-change'))
     return user
   },
-  isAuthenticated(){ return !!getSession() }
+  isAuthenticated(){ return !!getSession() },
+  
+  // Admin User CRUD
+  getAllUsers() {
+    return loadUsers()
+  },
+  createUser({ name, email, password, role }) {
+    const users = loadUsers()
+    if (users.find(u => u.email === email)) {
+      throw new Error('Email already registered')
+    }
+    const id = Date.now()
+    const newUser = { id, name, email, password, role: role || 'student' }
+    users.push(newUser)
+    saveUsers(users)
+    return newUser
+  },
+  updateUser(id, updatedFields) {
+    const users = loadUsers()
+    const idx = users.findIndex(u => u.id === id)
+    if (idx === -1) throw new Error('User not found')
+    
+    if (updatedFields.email && updatedFields.email !== users[idx].email) {
+      if (users.find(u => u.email === updatedFields.email && u.id !== id)) {
+        throw new Error('Email already in use')
+      }
+    }
+
+    users[idx] = {
+      ...users[idx],
+      ...updatedFields
+    }
+    saveUsers(users)
+    
+    const session = getSession()
+    if (session && session.userId === id) {
+      window.dispatchEvent(new CustomEvent('auth-change'))
+    }
+    return users[idx]
+  },
+  deleteUser(id) {
+    let users = loadUsers()
+    const user = users.find(u => u.id === id)
+    if (!user) throw new Error('User not found')
+    
+    users = users.filter(u => u.id !== id)
+    saveUsers(users)
+
+    const session = getSession()
+    if (session && session.userId === id) {
+      this.logout()
+    }
+  }
 }

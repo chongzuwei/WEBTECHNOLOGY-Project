@@ -43,7 +43,7 @@ const defaultResume = {
   ]
 }
 
-const templates = [
+const defaultTemplates = [
   { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: true, tag: 'Modern', atsReady: true },
   { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, tag: 'Classic', atsReady: true },
   { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, new: true, tag: 'Minimal', atsReady: false },
@@ -76,7 +76,12 @@ function getInitialState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      // Ensure templates exists in saved state, otherwise seed it
+      if (!parsed.templates) {
+        parsed.templates = JSON.parse(JSON.stringify(defaultTemplates))
+      }
+      return parsed
     }
   } catch (e) {
     console.error('Failed to load state', e)
@@ -86,6 +91,7 @@ function getInitialState() {
     versions: JSON.parse(JSON.stringify(defaultVersions)),
     exportHistory: JSON.parse(JSON.stringify(defaultExportHistory)),
     activities: JSON.parse(JSON.stringify(defaultActivities)),
+    templates: JSON.parse(JSON.stringify(defaultTemplates)),
     exportSettings: {
       format: 'PDF',
       paperSize: 'A4',
@@ -111,7 +117,11 @@ watch(state, (newState) => {
 
 export const store = {
   state,
-  templates,
+  
+  // Getter for templates list to support CRUD update notifications automatically
+  get templates() {
+    return state.templates
+  },
 
   // Resume modifications
   updatePersonalInfo(info) {
@@ -184,7 +194,7 @@ export const store = {
 
   setTemplate(templateId) {
     state.resumeData.selected_template_id = templateId
-    const template = templates.find(t => t.id === templateId)
+    const template = state.templates.find(t => t.id === templateId)
     this.addActivity('template', `Switched template to ${template?.name || 'Classic White'}`)
   },
 
@@ -232,11 +242,14 @@ export const store = {
   },
 
   deleteVersion(id) {
-    state.versions = state.versions.filter(v => v.id !== id)
-    this.addActivity('update', 'Deleted a resume version')
-    // Reset if deleted the active one
-    if (state.resumeData.id === id && state.versions.length > 0) {
-      this.selectVersionForExport(state.versions[0].id)
+    const idx = state.versions.findIndex(v => v.id === id)
+    if (idx !== -1) {
+      state.versions.splice(idx, 1)
+      this.addActivity('update', 'Deleted a resume version')
+      // Reset if deleted the active one
+      if (state.resumeData.id === id && state.versions.length > 0) {
+        this.selectVersionForExport(state.versions[0].id)
+      }
     }
   },
 
@@ -264,6 +277,48 @@ export const store = {
     }
     state.exportHistory.unshift(record)
     this.addActivity('export', `Exported ${filename} (${format})`)
+  },
+
+  // Template CRUD (Admin)
+  createTemplate(tplData) {
+    const id = state.templates.length > 0 ? Math.max(...state.templates.map(t => t.id)) + 1 : 1
+    const newTpl = {
+      id,
+      name: tplData.name || 'Untitled Template',
+      description: tplData.description || '',
+      rating: parseFloat(tplData.rating) || 5.0,
+      uses: tplData.uses || '0',
+      layout_type: tplData.layout_type || 'single-column',
+      is_active: tplData.is_active !== undefined ? tplData.is_active : 1,
+      popular: tplData.popular || false,
+      new: tplData.new || false,
+      tag: tplData.tag || 'Modern',
+      atsReady: tplData.atsReady || false
+    }
+    state.templates.push(newTpl)
+    this.addActivity('update', `Created new template: ${newTpl.name}`)
+    return newTpl
+  },
+
+  updateTemplate(id, tplData) {
+    const idx = state.templates.findIndex(t => t.id === id)
+    if (idx !== -1) {
+      state.templates[idx] = {
+        ...state.templates[idx],
+        ...tplData,
+        rating: parseFloat(tplData.rating) || state.templates[idx].rating
+      }
+      this.addActivity('update', `Updated template: ${state.templates[idx].name}`)
+    }
+  },
+
+  deleteTemplate(id) {
+    const idx = state.templates.findIndex(t => t.id === id)
+    if (idx !== -1) {
+      const tpl = state.templates[idx]
+      state.templates.splice(idx, 1)
+      this.addActivity('update', `Deleted template: ${tpl.name}`)
+    }
   },
 
   // Utility

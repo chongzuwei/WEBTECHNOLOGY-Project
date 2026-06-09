@@ -58,16 +58,24 @@
 
         <!-- Dropdown Menu -->
         <div v-if="showMenu" class="nav-dropdown">
-          <a @click.prevent="goTo('/')" class="dropdown-item">
+          <a @click.stop.prevent="goTo(user && user.role === 'admin' ? '/admin' : '/')" class="dropdown-item">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Dashboard
           </a>
-          <a @click.prevent="goTo('/settings')" class="dropdown-item">
+          <a v-if="user && user.role === 'admin' && route.path !== '/admin'" @click.stop.prevent="goTo('/admin')" class="dropdown-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            Admin Panel
+          </a>
+          <a v-if="user && user.role === 'admin'" @click.stop.prevent="goTo('/editor')" class="dropdown-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            Student Editor View
+          </a>
+          <a @click.stop.prevent="goTo('/settings')" class="dropdown-item">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Edit Profile
           </a>
           <div class="dropdown-divider"></div>
-          <a href="#" @click.prevent="doLogout" class="dropdown-item logout-link">
+          <a href="#" @click.stop.prevent="doLogout" class="dropdown-item logout-link">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
             Logout
           </a>
@@ -145,6 +153,8 @@ export default {
       switch (route.name) {
         case 'Dashboard':
           return 'My Resume Dashboard'
+        case 'AdminDashboard':
+          return 'Admin Dashboard'
         case 'Templates':
           return 'Choose Your Style'
         case 'Versions':
@@ -174,7 +184,8 @@ export default {
       isEditorRoute,
       pageTitle,
       avatarLetter,
-      triggerPrint
+      triggerPrint,
+      route
     }
   }
 }

@@ -4,6 +4,7 @@ import Editor from '../views/Editor.vue'
 import Templates from '../views/Templates.vue'
 import Versions from '../views/Versions.vue'
 import Insights from '../views/Insights.vue'
+import AdminDashboard from '../views/AdminDashboard.vue'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import Settings from '../views/Settings.vue'
@@ -17,6 +18,7 @@ const routes = [
   { path: '/templates', name: 'Templates', component: Templates, meta: { requiresAuth: true } },
   { path: '/versions', name: 'Versions', component: Versions, meta: { requiresAuth: true } },
   { path: '/insights', name: 'Insights', component: Insights, meta: { requiresAuth: true } },
+  { path: '/admin', name: 'AdminDashboard', component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/login', name: 'Login', component: Login },
   { path: '/register', name: 'Register', component: Register },
   { path: '/settings', name: 'Settings', component: Settings, meta: { requiresAuth: true } },
@@ -31,9 +33,24 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  if (to.meta.requiresAuth && !auth.isAuthenticated()) {
+  const isAuthenticated = auth.isAuthenticated()
+  const user = auth.getUser()
+
+  if (to.meta.requiresAuth && !isAuthenticated) {
     return next({ path: '/login', query: { redirect: to.fullPath } })
   }
+
+  if (isAuthenticated && user) {
+    // Redirect admin to admin dashboard if accessing home page
+    if (user.role === 'admin' && to.path === '/') {
+      return next({ path: '/admin' })
+    }
+    // Block non-admin from admin page
+    if (to.meta.requiresAdmin && user.role !== 'admin') {
+      return next({ path: '/' })
+    }
+  }
+
   next()
 })
 

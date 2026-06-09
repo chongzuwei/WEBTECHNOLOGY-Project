@@ -595,7 +595,7 @@ export default {
   setup() {
     const currentStep = ref(1)
     const storeState = store.state
-    const storeTemplates = store.templates
+    const storeTemplates = computed(() => store.state.templates.filter(t => t.is_active === 1))
 
     // Tracking active card selections
     const activeEduId = ref(null)

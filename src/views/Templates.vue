@@ -206,7 +206,7 @@ export default {
     })
 
     const filteredTemplates = computed(() => {
-      let list = [...storeTemplates]
+      let list = store.state.templates.filter(t => t.is_active === 1)
 
       // Search query
       if (searchQuery.value.trim()) {
