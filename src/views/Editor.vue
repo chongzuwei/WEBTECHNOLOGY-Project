@@ -688,6 +688,7 @@ export default {
     }
 
     onMounted(() => {
+      store.incrementPreviewSessions()
       // Default active selections on mount
       if (storeState.resumeData.education.length > 0) {
         activeEduId.value = storeState.resumeData.education[0].id

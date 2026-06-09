@@ -309,6 +309,7 @@ export default {
     })
 
     function getAITips() {
+      store.incrementAIClicks()
       alert("AI optimization tips:\n\n1. Use action verbs (e.g. Led, Optimized, Built) at the start of experience bullet points.\n2. Incorporate exact technical keywords from the job description to bypass ATS filters.\n3. Keep experience descriptions limited to 3-5 concise bullet points.")
     }
 

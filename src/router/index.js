@@ -11,6 +11,7 @@ import Settings from '../views/Settings.vue'
 import About from '../views/About.vue'
 import Contact from '../views/Contact.vue'
 import auth from '@/services/auth'
+import { store } from '@/services/store'
 
 const routes = [
   { path: '/', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
@@ -41,6 +42,9 @@ router.beforeEach((to, from, next) => {
   }
 
   if (isAuthenticated && user) {
+    // Initialize the store for this user
+    store.initForUser(user.id)
+
     // Redirect admin to admin dashboard if accessing home page
     if (user.role === 'admin' && to.path === '/') {
       return next({ path: '/admin' })

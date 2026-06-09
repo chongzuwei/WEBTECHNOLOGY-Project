@@ -4,10 +4,15 @@ const STORAGE_SESSION_KEY = 'wt_session'
 function loadUsers(){
   try{
     let users = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]')
-    if (users.length === 0) {
+    if (users.length === 0 || !users.some(u => u.name === 'Jamie Liu')) {
       users = [
-        { id: 12, name: 'Alex Chen', email: 'alex.chen@example.com', password: 'password', role: 'student' },
-        { id: 13, name: 'Ms. Nadia', email: 'admin@maxcv.com', password: 'password', role: 'admin' }
+        { id: 124, name: 'Alex Chen', email: 'alex.chen@example.com', password: 'password', role: 'student' },
+        { id: 125, name: 'Jamie Liu', email: 'jamie.liu@school.edu', password: 'password', role: 'student' },
+        { id: 103, name: 'Sarah Reid', email: 'admin@maxcv.com', password: 'password', role: 'admin' },
+        { id: 126, name: 'Kevin Wang', email: 'kevin.w@university.edu', password: 'password', role: 'student' },
+        { id: 127, name: 'Maya Lee', email: 'maya.lee@gmail.com', password: 'password', role: 'student' },
+        { id: 128, name: 'David Kim', email: 'd.kim@techuni.edu', password: 'password', role: 'student' },
+        { id: 129, name: 'Lily Park', email: 'lily.park@design.edu', password: 'password', role: 'student' }
       ]
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users))
     }
@@ -21,7 +26,7 @@ function getSession(){
     let session = JSON.parse(localStorage.getItem(STORAGE_SESSION_KEY) || 'null')
     if (!session && localStorage.getItem('maxcv_logged_out') !== 'true') {
       // Seed initial session for demo, unless they explicitly logged out
-      session = { userId: 12, token: 'fake-jwt-12' }
+      session = { userId: 124, token: 'fake-jwt-124' }
       localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session))
     }
     return session

@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import auth from '@/services/auth'
 
 const STORAGE_KEY = 'maxcv_store_state'
 
@@ -72,14 +73,81 @@ const defaultActivities = [
   { id: 4, type: 'duplicate', text: 'Duplicated Frontend Developer v1', time: 'Apr 30, 2026 - 2:05 PM', icon: 'duplicate' }
 ]
 
+const defaultGlobalExports = [
+  { id: 1, userName: 'Alex Chen', userEmail: 'alex.chen@example.com', filename: 'Intern_Application_v2.pdf', date: 'May 5, 2026 10:24 AM', format: 'PDF' },
+  { id: 2, userName: 'Aina', userEmail: 'aina@example.com', filename: 'Internship_Resume.pdf', date: 'May 5, 2026 11:30 AM', format: 'PDF' },
+  { id: 3, userName: 'Faris', userEmail: 'faris@example.com', filename: 'Technical_Dev_v2.pdf', date: 'May 5, 2026 4:12 PM', format: 'PDF' },
+  { id: 4, userName: 'Alex Chen', userEmail: 'alex.chen@example.com', filename: 'Frontend_Developer_v1.pdf', date: 'May 4, 2026 3:15 PM', format: 'PDF' },
+  { id: 5, userName: 'Alex Chen', userEmail: 'alex.chen@example.com', filename: 'Full_Stack_Intern_v2.docx', date: 'May 2, 2026 9:42 AM', format: 'DOCX' }
+]
+
 function getInitialState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      // Ensure templates exists in saved state, otherwise seed it
       if (!parsed.templates) {
         parsed.templates = JSON.parse(JSON.stringify(defaultTemplates))
+      }
+      if (!parsed.globalExportsLog) {
+        parsed.globalExportsLog = JSON.parse(JSON.stringify(defaultGlobalExports))
+      }
+      if (!parsed.resumesByUser || !parsed.resumesByUser[124] || !parsed.resumesByUser[125]) {
+        parsed.resumesByUser = {
+          124: {
+            resumeData: parsed.resumeData || JSON.parse(JSON.stringify(defaultResume)),
+            versions: parsed.versions ? parsed.versions.slice(0, 3) : JSON.parse(JSON.stringify(defaultVersions)).slice(0, 3)
+          },
+          125: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: [
+              { id: 1001, title: 'Internship Resume', template_id: 1, last_edited: 'Feb 3, 2026', selected_for_export: true },
+              { id: 1002, title: 'Job Application Draft', template_id: 2, last_edited: 'Feb 2, 2026', selected_for_export: false },
+              { id: 1003, title: 'V3 Backup', template_id: 3, last_edited: 'Jan 28, 2026', selected_for_export: false },
+              { id: 1004, title: 'Design Layout Spec', template_id: 4, last_edited: 'Jan 24, 2026', selected_for_export: false },
+              { id: 1005, title: 'V5 Final', template_id: 5, last_edited: 'Jan 20, 2026', selected_for_export: false }
+            ]
+          },
+          103: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: []
+          },
+          126: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: [
+              { id: 2001, title: 'Kevin Resume v1', template_id: 1, last_edited: 'Feb 18, 2026', selected_for_export: true },
+              { id: 2002, title: 'Kevin Resume v2', template_id: 2, last_edited: 'Feb 15, 2026', selected_for_export: false }
+            ]
+          },
+          127: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: [
+              { id: 3001, title: 'Maya Resume v1', template_id: 1, last_edited: 'Mar 5, 2026', selected_for_export: true }
+            ]
+          },
+          128: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: [
+              { id: 4001, title: 'David Resume v1', template_id: 1, last_edited: 'Mar 12, 2026', selected_for_export: true },
+              { id: 4002, title: 'David Resume v2', template_id: 2, last_edited: 'Mar 10, 2026', selected_for_export: false },
+              { id: 4003, title: 'David Resume v3', template_id: 3, last_edited: 'Mar 5, 2026', selected_for_export: false },
+              { id: 4004, title: 'David Resume v4', template_id: 4, last_edited: 'Mar 1, 2026', selected_for_export: false }
+            ]
+          },
+          129: {
+            resumeData: JSON.parse(JSON.stringify(defaultResume)),
+            versions: [
+              { id: 5001, title: 'Lily Resume v1', template_id: 1, last_edited: 'Mar 20, 2026', selected_for_export: true },
+              { id: 5002, title: 'Lily Resume v2', template_id: 2, last_edited: 'Mar 18, 2026', selected_for_export: false }
+            ]
+          }
+        }
+      }
+      if (parsed.previewSessionsCounter === undefined) {
+        parsed.previewSessionsCounter = 42
+      }
+      if (parsed.aiChecklistClicks === undefined) {
+        parsed.aiChecklistClicks = 18
       }
       return parsed
     }
@@ -92,6 +160,58 @@ function getInitialState() {
     exportHistory: JSON.parse(JSON.stringify(defaultExportHistory)),
     activities: JSON.parse(JSON.stringify(defaultActivities)),
     templates: JSON.parse(JSON.stringify(defaultTemplates)),
+    globalExportsLog: JSON.parse(JSON.stringify(defaultGlobalExports)),
+    resumesByUser: {
+      124: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: JSON.parse(JSON.stringify(defaultVersions)).slice(0, 3)
+      },
+      125: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: [
+          { id: 1001, title: 'Internship Resume', template_id: 1, last_edited: 'Feb 3, 2026', selected_for_export: true },
+          { id: 1002, title: 'Job Application Draft', template_id: 2, last_edited: 'Feb 2, 2026', selected_for_export: false },
+          { id: 1003, title: 'V3 Backup', template_id: 3, last_edited: 'Jan 28, 2026', selected_for_export: false },
+          { id: 1004, title: 'Design Layout Spec', template_id: 4, last_edited: 'Jan 24, 2026', selected_for_export: false },
+          { id: 1005, title: 'V5 Final', template_id: 5, last_edited: 'Jan 20, 2026', selected_for_export: false }
+        ]
+      },
+      103: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: []
+      },
+      126: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: [
+          { id: 2001, title: 'Kevin Resume v1', template_id: 1, last_edited: 'Feb 18, 2026', selected_for_export: true },
+          { id: 2002, title: 'Kevin Resume v2', template_id: 2, last_edited: 'Feb 15, 2026', selected_for_export: false }
+        ]
+      },
+      127: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: [
+          { id: 3001, title: 'Maya Resume v1', template_id: 1, last_edited: 'Mar 5, 2026', selected_for_export: true }
+        ]
+      },
+      128: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: [
+          { id: 4001, title: 'David Resume v1', template_id: 1, last_edited: 'Mar 12, 2026', selected_for_export: true },
+          { id: 4002, title: 'David Resume v2', template_id: 2, last_edited: 'Mar 10, 2026', selected_for_export: false },
+          { id: 4003, title: 'David Resume v3', template_id: 3, last_edited: 'Mar 5, 2026', selected_for_export: false },
+          { id: 4004, title: 'David Resume v4', template_id: 4, last_edited: 'Mar 1, 2026', selected_for_export: false }
+        ]
+      },
+      129: {
+        resumeData: JSON.parse(JSON.stringify(defaultResume)),
+        versions: [
+          { id: 5001, title: 'Lily Resume v1', template_id: 1, last_edited: 'Mar 20, 2026', selected_for_export: true },
+          { id: 5002, title: 'Lily Resume v2', template_id: 2, last_edited: 'Mar 18, 2026', selected_for_export: false }
+        ]
+      }
+    },
+    previewSessionsCounter: 42,
+    aiChecklistClicks: 18,
     exportSettings: {
       format: 'PDF',
       paperSize: 'A4',
@@ -269,6 +389,9 @@ export const store = {
   // Export management
   addExportRecord(filename, format) {
     const id = Date.now()
+    const user = auth.getUser()
+
+    // User-specific history
     const record = {
       id,
       filename,
@@ -276,6 +399,18 @@ export const store = {
       format
     }
     state.exportHistory.unshift(record)
+
+    // Global platform-wide logs
+    const globalRecord = {
+      id,
+      userName: user ? user.name : 'Guest',
+      userEmail: user ? user.email : 'guest@example.com',
+      filename,
+      date: this.formatTodayTime(),
+      format
+    }
+    state.globalExportsLog.unshift(globalRecord)
+
     this.addActivity('export', `Exported ${filename} (${format})`)
   },
 
@@ -319,6 +454,68 @@ export const store = {
       state.templates.splice(idx, 1)
       this.addActivity('update', `Deleted template: ${tpl.name}`)
     }
+  },
+
+  // User specific resume management
+  initForUser(userId) {
+    if (!userId) return
+    
+    if (!state.resumesByUser) {
+      state.resumesByUser = {}
+    }
+    
+    if (!state.resumesByUser[userId]) {
+      const allUsers = auth.getAllUsers()
+      const user = allUsers.find(u => u.id === userId)
+      const userResume = JSON.parse(JSON.stringify(defaultResume))
+      if (user) {
+        userResume.personal.name = user.name
+        userResume.personal.email = user.email
+      }
+      userResume.id = Date.now()
+      
+      const userVersions = JSON.parse(JSON.stringify(defaultVersions))
+      if (userVersions.length > 0) {
+        userVersions[0].id = userResume.id
+        userVersions[0].title = userResume.title
+      }
+      
+      state.resumesByUser[userId] = {
+        resumeData: userResume,
+        versions: userVersions
+      }
+    }
+    
+    state.resumeData = state.resumesByUser[userId].resumeData
+    state.versions = state.resumesByUser[userId].versions
+  },
+
+  getUserResumes(userId) {
+    if (!state.resumesByUser || !state.resumesByUser[userId]) {
+      this.initForUser(userId)
+    }
+    return state.resumesByUser[userId]?.versions || []
+  },
+
+  getUserResumeData(userId) {
+    if (!state.resumesByUser || !state.resumesByUser[userId]) {
+      this.initForUser(userId)
+    }
+    return state.resumesByUser[userId]?.resumeData || null
+  },
+
+  incrementPreviewSessions() {
+    if (state.previewSessionsCounter === undefined) {
+      state.previewSessionsCounter = 42
+    }
+    state.previewSessionsCounter++
+  },
+
+  incrementAIClicks() {
+    if (state.aiChecklistClicks === undefined) {
+      state.aiChecklistClicks = 18
+    }
+    state.aiChecklistClicks++
   },
 
   // Utility
