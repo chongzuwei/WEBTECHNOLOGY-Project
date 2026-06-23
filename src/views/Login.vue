@@ -51,7 +51,7 @@
 
 <script>
 import auth from '@/services/auth'
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 export default {
@@ -80,7 +80,7 @@ export default {
       if(!validate()) return
       submitting.value = true
       try{
-        auth.login({ email: email.value, password: password.value })
+        await auth.login({ email: email.value, password: password.value })
         const redirect = route.query.redirect || '/'
         router.push(redirect)
       }catch(err){ 
@@ -93,12 +93,6 @@ export default {
     function forgotPassword() {
       alert('Mock password reset instructions sent to your email!')
     }
-
-    onMounted(() => {
-      // Auto fill seeded user credentials for easier demo
-      email.value = 'alex.chen@example.com'
-      password.value = 'password'
-    })
 
     return { email, password, submit, error, emailError, passwordError, submitting, forgotPassword }
   }

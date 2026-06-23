@@ -83,7 +83,7 @@ export default {
       if(!validate()) return
       submitting.value = true
       try{
-        auth.register({ name:name.value, email:email.value, password:password.value })
+        await auth.register({ name:name.value, email:email.value, password:password.value })
         router.push('/')
       }catch(err){ 
         error.value = err.message 

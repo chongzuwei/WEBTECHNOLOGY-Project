@@ -83,7 +83,7 @@ export default {
       }
 
       try{
-        auth.updateProfile({ 
+        await auth.updateProfile({ 
           name: name.value, 
           email: email.value, 
           currentPassword: currentPassword.value || undefined, 

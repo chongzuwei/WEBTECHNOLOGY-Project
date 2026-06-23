@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import auth from '@/services/auth'
+import { apiRequest } from '@/services/auth'
 
 const STORAGE_KEY = 'maxcv_store_state'
 
@@ -44,14 +45,7 @@ const defaultResume = {
   ]
 }
 
-const defaultTemplates = [
-  { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: true, tag: 'Modern', atsReady: true },
-  { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, tag: 'Classic', atsReady: true },
-  { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, new: true, tag: 'Minimal', atsReady: false },
-  { id: 4, name: 'Creative Teal', description: 'Vibrant teal accents and unique timeline layout, perfect for UI/UX and product designers.', rating: 4.9, uses: '1,100', layout_type: '2-column', is_active: 1, tag: 'Creative', atsReady: false },
-  { id: 5, name: 'Clean Green', description: 'Minimalist layout accented with soft forest green elements and sans-serif typography.', rating: 4.6, uses: '654', layout_type: 'single-column', is_active: 1, tag: 'Modern', atsReady: true },
-  { id: 6, name: 'Warm Amber', description: 'Card-based content grouping with a warm amber palette for business and creative jobs.', rating: 4.5, uses: '432', layout_type: 'card-layout', is_active: 1, tag: 'Creative', atsReady: true }
-]
+const defaultTemplates = []
 
 const defaultVersions = [
   { id: 1, title: 'Intern Application_v2', template_id: 1, last_edited: 'May 5, 2026', selected_for_export: true },
@@ -86,9 +80,7 @@ function getInitialState() {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
       const parsed = JSON.parse(saved)
-      if (!parsed.templates) {
-        parsed.templates = JSON.parse(JSON.stringify(defaultTemplates))
-      }
+      parsed.templates = []
       if (!parsed.globalExportsLog) {
         parsed.globalExportsLog = JSON.parse(JSON.stringify(defaultGlobalExports))
       }
@@ -226,6 +218,10 @@ function getInitialState() {
 
 const state = reactive(getInitialState())
 
+function replaceTemplateList(templates) {
+  state.templates.splice(0, state.templates.length, ...templates)
+}
+
 // Auto-save changes to localStorage
 watch(state, (newState) => {
   try {
@@ -240,6 +236,12 @@ export const store = {
   
   // Getter for templates list to support CRUD update notifications automatically
   get templates() {
+    return state.templates
+  },
+
+  async loadTemplates() {
+    const payload = await apiRequest('/templates')
+    replaceTemplateList(payload.templates || [])
     return state.templates
   },
 
@@ -415,39 +417,35 @@ export const store = {
   },
 
   // Template CRUD (Admin)
-  createTemplate(tplData) {
-    const id = state.templates.length > 0 ? Math.max(...state.templates.map(t => t.id)) + 1 : 1
-    const newTpl = {
-      id,
-      name: tplData.name || 'Untitled Template',
-      description: tplData.description || '',
-      rating: parseFloat(tplData.rating) || 5.0,
-      uses: tplData.uses || '0',
-      layout_type: tplData.layout_type || 'single-column',
-      is_active: tplData.is_active !== undefined ? tplData.is_active : 1,
-      popular: tplData.popular || false,
-      new: tplData.new || false,
-      tag: tplData.tag || 'Modern',
-      atsReady: tplData.atsReady || false
-    }
+  async createTemplate(tplData) {
+    const payload = await apiRequest('/templates', {
+      method: 'POST',
+      body: JSON.stringify(tplData)
+    })
+    const newTpl = payload.template
     state.templates.push(newTpl)
     this.addActivity('update', `Created new template: ${newTpl.name}`)
     return newTpl
   },
 
-  updateTemplate(id, tplData) {
+  async updateTemplate(id, tplData) {
+    const payload = await apiRequest(`/templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(tplData)
+    })
+    const updatedTemplate = payload.template
     const idx = state.templates.findIndex(t => t.id === id)
     if (idx !== -1) {
-      state.templates[idx] = {
-        ...state.templates[idx],
-        ...tplData,
-        rating: parseFloat(tplData.rating) || state.templates[idx].rating
-      }
-      this.addActivity('update', `Updated template: ${state.templates[idx].name}`)
+      state.templates[idx] = updatedTemplate
+    } else {
+      state.templates.push(updatedTemplate)
     }
+    this.addActivity('update', `Updated template: ${updatedTemplate.name}`)
+    return updatedTemplate
   },
 
-  deleteTemplate(id) {
+  async deleteTemplate(id) {
+    await apiRequest(`/templates/${id}`, { method: 'DELETE' })
     const idx = state.templates.findIndex(t => t.id === id)
     if (idx !== -1) {
       const tpl = state.templates[idx]
@@ -465,10 +463,9 @@ export const store = {
     }
     
     if (!state.resumesByUser[userId]) {
-      const allUsers = auth.getAllUsers()
-      const user = allUsers.find(u => u.id === userId)
+      const user = auth.getUser()
       const userResume = JSON.parse(JSON.stringify(defaultResume))
-      if (user) {
+      if (user && user.id === userId) {
         userResume.personal.name = user.name
         userResume.personal.email = user.email
       }

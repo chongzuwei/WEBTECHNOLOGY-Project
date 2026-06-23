@@ -138,7 +138,7 @@
               <td class="actions-cell">
                 <button @click="openViewUserModal(u)" class="btn-table-action btn-view" title="View Profile">👁️</button>
                 <button @click="openUserModal(u)" class="btn-table-action btn-edit" title="Edit Settings">✏️</button>
-                <button @click="deleteUserLocal(u.id)" class="btn-table-action btn-delete" :disabled="u.email === 'admin@maxcv.com'" title="Delete Account">🗑️</button>
+                <button @click="deleteUserLocal(u.id)" class="btn-table-action btn-delete" :disabled="u.role === 'admin'" title="Delete Account">🗑️</button>
               </td>
             </tr>
             <tr v-if="filteredUsers.length === 0">
@@ -722,12 +722,17 @@ export default {
     const templatePreviewVisible = ref(false)
     const templatePreviewTarget = ref(null)
 
-    function fetchUsers() {
-      users.value = auth.getAllUsers()
+    async function fetchUsers() {
+      users.value = await auth.getAllUsers()
     }
 
-    onMounted(() => {
-      fetchUsers()
+    onMounted(async () => {
+      void fetchUsers()
+      try {
+        await store.loadTemplates()
+      } catch (error) {
+        console.error('Failed to load templates', error)
+      }
       if (storeState.templates && storeState.templates.length > 0) {
         selectTemplateForEdit(storeState.templates[0])
       }
@@ -815,7 +820,7 @@ export default {
       userModalVisible.value = true
     }
 
-    function saveUser() {
+    async function saveUser() {
       userModalError.value = ''
       const form = userForm.value
       
@@ -828,7 +833,7 @@ export default {
           return userModalError.value = 'Password must be at least 6 characters'
         }
         try {
-          auth.createUser({
+          await auth.createUser({
             name: form.name.trim(),
             email: form.email.trim(),
             password: form.password,
@@ -850,7 +855,7 @@ export default {
           if (form.password && form.password.trim().length >= 6) {
             updateFields.password = form.password.trim()
           }
-          auth.updateUser(editingUserId.value, updateFields)
+          await auth.updateUser(editingUserId.value, updateFields)
           userModalVisible.value = false
           fetchUsers()
         } catch (e) {
@@ -859,10 +864,10 @@ export default {
       }
     }
 
-    function deleteUserLocal(id) {
+    async function deleteUserLocal(id) {
       if (confirm('Are you sure you want to delete this user account? All resume metadata will be permanently lost.')) {
         try {
-          auth.deleteUser(id)
+          await auth.deleteUser(id)
           fetchUsers()
         } catch (e) {
           alert(e.message)
@@ -911,7 +916,7 @@ export default {
       templateFormTags.value = ['Modern', 'ATS-Friendly']
     }
 
-    function saveSidebarTemplate() {
+    async function saveSidebarTemplate() {
       templateSidebarError.value = ''
       const form = templateForm.value
       
@@ -927,14 +932,16 @@ export default {
       }
       saveTagsFromForm(payload)
 
-      if (templateSidebarMode.value === 'add') {
-        const newTpl = store.createTemplate(payload)
-        selectTemplateForEdit(newTpl)
-      } else {
-        store.updateTemplate(editingTemplateId.value, payload)
-        // Refresh local sidebar view object reference
-        const updated = storeState.templates.find(t => t.id === editingTemplateId.value)
-        if (updated) selectTemplateForEdit(updated)
+      try {
+        if (templateSidebarMode.value === 'add') {
+          const newTpl = await store.createTemplate(payload)
+          selectTemplateForEdit(newTpl)
+        } else {
+          const updated = await store.updateTemplate(editingTemplateId.value, payload)
+          selectTemplateForEdit(updated)
+        }
+      } catch (error) {
+        templateSidebarError.value = error.message
       }
     }
 
@@ -951,7 +958,7 @@ export default {
       }
     }
 
-    function duplicateTemplate(t) {
+    async function duplicateTemplate(t) {
       const payload = {
         name: `${t.name} (Copy)`,
         description: t.description,
@@ -964,8 +971,12 @@ export default {
         new: t.new || false,
         atsReady: t.atsReady || false
       }
-      const newTpl = store.createTemplate(payload)
-      selectTemplateForEdit(newTpl)
+      try {
+        const newTpl = await store.createTemplate(payload)
+        selectTemplateForEdit(newTpl)
+      } catch (error) {
+        templateSidebarError.value = error.message
+      }
     }
 
     function previewTemplate(t) {
@@ -973,12 +984,15 @@ export default {
       templatePreviewVisible.value = true
     }
 
-    function toggleTemplateStatus(tpl) {
+    async function toggleTemplateStatus(tpl) {
       const nextActive = tpl.is_active === 1 ? 0 : 1
-      store.updateTemplate(tpl.id, { is_active: nextActive })
-      
-      if (editingTemplateId.value === tpl.id) {
-        templateForm.value.is_active = (nextActive === 1)
+      try {
+        const updated = await store.updateTemplate(tpl.id, { is_active: nextActive })
+        if (editingTemplateId.value === tpl.id) {
+          templateForm.value.is_active = (updated.is_active === 1)
+        }
+      } catch (error) {
+        templateSidebarError.value = error.message
       }
     }
 
@@ -988,17 +1002,8 @@ export default {
     }
 
     function getRegistrationDate(u) {
-      if (u.name === 'Alex Chen') return 'Jan 15, 2026'
-      if (u.name === 'Jamie Liu') return 'Feb 3, 2026'
-      if (u.name === 'Sarah Reid') return 'Sep 1, 2025'
-      if (u.name === 'Kevin Wang') return 'Feb 18, 2026'
-      if (u.name === 'Maya Lee') return 'Mar 5, 2026'
-      if (u.name === 'David Kim') return 'Mar 12, 2026'
-      if (u.name === 'Lily Park') return 'Mar 20, 2026'
-      
-      // Default fallback for dynamically added admin-panel users
-      if (!u.id) return 'Mar 25, 2026'
-      return new Date(u.id).toLocaleDateString(undefined, {
+      const sourceDate = u.created_at || u.id
+      return new Date(sourceDate).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -1017,22 +1022,21 @@ export default {
     }
 
     function getAvatarColorClass(name) {
-      if (name.includes('Alex')) return 'avatar-blue'
-      if (name.includes('Jamie')) return 'avatar-green'
-      if (name.includes('Sarah')) return 'avatar-purple'
-      if (name.includes('Kevin')) return 'avatar-orange'
-      if (name.includes('Maya')) return 'avatar-red'
-      if (name.includes('David')) return 'avatar-teal'
-      if (name.includes('Lily')) return 'avatar-pink'
-      return 'avatar-default'
+      const classes = ['avatar-blue', 'avatar-green', 'avatar-purple', 'avatar-orange', 'avatar-red', 'avatar-teal', 'avatar-pink']
+      const total = String(name || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+      return classes[total % classes.length] || 'avatar-default'
     }
 
-    function deleteTemplateLocal(id) {
+    async function deleteTemplateLocal(id) {
       if (confirm('Are you sure you want to delete this template from the library?')) {
-        store.deleteTemplate(id)
-        if (editingTemplateId.value === id) {
-          editingTemplateId.value = null
-          cancelSidebarEdit()
+        try {
+          await store.deleteTemplate(id)
+          if (editingTemplateId.value === id) {
+            editingTemplateId.value = null
+            cancelSidebarEdit()
+          }
+        } catch (error) {
+          alert(error.message)
         }
       }
     }

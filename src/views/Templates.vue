@@ -179,7 +179,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { store } from '@/services/store'
 
@@ -188,18 +188,28 @@ export default {
     const router = useRouter()
     const storeState = store.state
     const storeTemplates = store.templates
+    const emptyTemplate = { id: 1, name: 'Loading...', description: '', rating: 0, uses: '0', tag: '', layout_type: '', is_active: 1, atsReady: false }
 
     const searchQuery = ref('')
     const activeCategory = ref('All')
     const sortBy = ref('popular')
 
-    const focusedTemplate = ref(storeTemplates[0])
+    const focusedTemplate = ref(storeTemplates[0] || emptyTemplate)
 
     // Preview Modal triggers
     const previewDialogVisible = ref(false)
     const previewTarget = ref(null)
 
     const categories = ['All', 'Modern', 'Classic', 'Minimal', 'Creative', 'Tech']
+
+    onMounted(async () => {
+      try {
+        await store.loadTemplates()
+        focusedTemplate.value = store.state.templates.find(t => t.id === storeState.resumeData.selected_template_id) || store.state.templates[0] || emptyTemplate
+      } catch (error) {
+        console.error('Failed to load templates', error)
+      }
+    })
 
     const userRole = computed(() => {
       return storeState.resumeData.personal.title || 'Frontend Developer'
