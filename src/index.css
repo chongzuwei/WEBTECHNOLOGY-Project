@@ -36,6 +36,17 @@
   
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+
+  /* Compatibility aliases for build resume components */
+  --primary-color: var(--color-primary);
+  --primary-color-hover: var(--color-primary-hover);
+  --primary-color-light: var(--color-primary-light);
+  --primary-color-dark: var(--color-primary-dark);
+  --border-color: var(--color-border);
+  --input-bg: var(--color-bg-card);
+  --text-primary: var(--color-text-main);
+  --text-secondary: var(--color-text-muted);
+  --card-bg: var(--color-bg-card);
 }
 
 * {
