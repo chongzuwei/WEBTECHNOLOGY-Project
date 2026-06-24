@@ -95,6 +95,11 @@ db.exec(`
     new INTEGER DEFAULT 0,
     tag TEXT DEFAULT 'Modern',
     atsReady INTEGER DEFAULT 0,
+    primary_color TEXT DEFAULT '#2563eb',
+    title_color TEXT DEFAULT '#2563eb',
+    text_color TEXT DEFAULT '#334155',
+    font_family TEXT DEFAULT 'Inter',
+    heading_style TEXT DEFAULT 'underline',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -116,6 +121,37 @@ try {
   db.prepare("SELECT content FROM resumes LIMIT 1").get()
 } catch (e) {
   db.exec("ALTER TABLE resumes ADD COLUMN content TEXT")
+}
+
+// Migration: Check and add missing columns to templates table to ensure all fields exist
+const expectedTemplatesColumns = [
+  { name: 'description', type: 'TEXT' },
+  { name: 'rating', type: 'REAL DEFAULT 5.0' },
+  { name: 'uses', type: "TEXT DEFAULT '0'" },
+  { name: 'layout_type', type: 'TEXT' },
+  { name: 'is_active', type: 'INTEGER DEFAULT 1' },
+  { name: 'popular', type: 'INTEGER DEFAULT 0' },
+  { name: 'new', type: 'INTEGER DEFAULT 0' },
+  { name: 'tag', type: "TEXT DEFAULT 'Modern'" },
+  { name: 'atsReady', type: 'INTEGER DEFAULT 0' },
+  { name: 'primary_color', type: "TEXT DEFAULT '#2563eb'" },
+  { name: 'title_color', type: "TEXT DEFAULT '#2563eb'" },
+  { name: 'text_color', type: "TEXT DEFAULT '#334155'" },
+  { name: 'font_family', type: "TEXT DEFAULT 'Inter'" },
+  { name: 'heading_style', type: "TEXT DEFAULT 'underline'" }
+]
+
+for (const col of expectedTemplatesColumns) {
+  try {
+    db.prepare(`SELECT ${col.name} FROM templates LIMIT 1`).get()
+  } catch (e) {
+    console.log(`Migration: Adding missing column ${col.name} to templates table`)
+    try {
+      db.exec(`ALTER TABLE templates ADD COLUMN ${col.name} ${col.type}`)
+    } catch (alterError) {
+      console.error(`Failed to add column ${col.name}:`, alterError)
+    }
+  }
 }
 
 // ─── HELPERS ───
@@ -216,6 +252,11 @@ function publicTemplate(template) {
     new: Boolean(template.new),
     tag: template.tag || 'Modern',
     atsReady: Boolean(template.atsReady),
+    primary_color: template.primary_color || '#2563eb',
+    title_color: template.title_color || '#2563eb',
+    text_color: template.text_color || '#334155',
+    font_family: template.font_family || 'Inter',
+    heading_style: template.heading_style || 'underline',
     created_at: template.created_at,
     updated_at: template.updated_at
   }
@@ -267,22 +308,22 @@ function seedData() {
 
   // Seed Templates
   const templates = [
-    { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: 1, new: 0, tag: 'Modern', atsReady: 1 },
-    { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Classic', atsReady: 1 },
-    { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, popular: 0, new: 1, tag: 'Minimal', atsReady: 0 },
-    { id: 4, name: 'Creative Teal', description: 'Vibrant teal accents and unique timeline layout, perfect for UI/UX and product designers.', rating: 4.9, uses: '1,100', layout_type: '2-column', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 0 },
-    { id: 5, name: 'Clean Green', description: 'Minimalist layout accented with soft forest green elements and sans-serif typography.', rating: 4.6, uses: '654', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Modern', atsReady: 1 },
-    { id: 6, name: 'Warm Amber', description: 'Card-based content grouping with a warm amber palette for business and creative jobs.', rating: 4.5, uses: '432', layout_type: 'card-layout', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 1 }
+    { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: 1, new: 0, tag: 'Modern', atsReady: 1, primary_color: '#2563eb', title_color: '#2563eb', text_color: '#1e293b', font_family: 'Inter', heading_style: 'underline' },
+    { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Classic', atsReady: 1, primary_color: '#1e293b', title_color: '#1e293b', text_color: '#334155', font_family: 'Georgia', heading_style: 'border-top-bottom' },
+    { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, popular: 0, new: 1, tag: 'Minimal', atsReady: 0, primary_color: '#0f172a', title_color: '#475569', text_color: '#334155', font_family: 'Arial', heading_style: 'bg-fill' },
+    { id: 4, name: 'Creative Teal', description: 'Vibrant teal accents and unique timeline layout, perfect for UI/UX and product designers.', rating: 4.9, uses: '1,100', layout_type: '2-column', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 0, primary_color: '#0d9488', title_color: '#0f766e', text_color: '#1e293b', font_family: 'Inter', heading_style: 'simple' },
+    { id: 5, name: 'Clean Green', description: 'Minimalist layout accented with soft forest green elements and sans-serif typography.', rating: 4.6, uses: '654', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Modern', atsReady: 1, primary_color: '#059669', title_color: '#065f46', text_color: '#334155', font_family: 'Times New Roman', heading_style: 'lines-side' },
+    { id: 6, name: 'Warm Amber', description: 'Card-based content grouping with a warm amber palette for business and creative jobs.', rating: 4.5, uses: '432', layout_type: 'card-layout', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 1, primary_color: '#d97706', title_color: '#92400e', text_color: '#334155', font_family: 'Georgia', heading_style: 'dots' }
   ]
 
   const insertTemplate = db.prepare(`
-    INSERT INTO templates (id, name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO templates (id, name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, primary_color, title_color, text_color, font_family, heading_style, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   db.transaction(() => {
     for (const t of templates) {
-      insertTemplate.run(t.id, t.name, t.description, t.rating, t.uses, t.layout_type, t.is_active, t.popular, t.new, t.tag, t.atsReady, timestamp, timestamp)
+      insertTemplate.run(t.id, t.name, t.description, t.rating, t.uses, t.layout_type, t.is_active, t.popular, t.new, t.tag, t.atsReady, t.primary_color, t.title_color, t.text_color, t.font_family, t.heading_style, timestamp, timestamp)
     }
   })()
 
@@ -725,12 +766,17 @@ async function handleRequest(req, res) {
       const isNew = body.new ? 1 : 0
       const tag = body.tag || 'Modern'
       const atsReady = body.atsReady ? 1 : 0
+      const primaryColor = body.primary_color || '#2563eb'
+      const titleColor = body.title_color || '#2563eb'
+      const textColor = body.text_color || '#334155'
+      const fontFamily = body.font_family || 'Inter'
+      const headingStyle = body.heading_style || 'underline'
 
       const insert = db.prepare(`
-        INSERT INTO templates (name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO templates (name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, primary_color, title_color, text_color, font_family, heading_style, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
-      const result = insert.run(name, body.description || '', rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, timestamp, timestamp)
+      const result = insert.run(name, body.description || '', rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, primaryColor, titleColor, textColor, fontFamily, headingStyle, timestamp, timestamp)
       const template = getTemplateById(result.lastInsertRowid)
       return sendJson(res, 201, { template: publicTemplate(template) })
     }
@@ -768,14 +814,19 @@ async function handleRequest(req, res) {
       const isNew = body.new !== undefined ? (body.new ? 1 : 0) : template.new
       const tag = body.tag !== undefined ? String(body.tag || 'Modern') : template.tag
       const atsReady = body.atsReady !== undefined ? (body.atsReady ? 1 : 0) : template.atsReady
+      const primaryColor = body.primary_color !== undefined ? String(body.primary_color) : template.primary_color
+      const titleColor = body.title_color !== undefined ? String(body.title_color) : template.title_color
+      const textColor = body.text_color !== undefined ? String(body.text_color) : template.text_color
+      const fontFamily = body.font_family !== undefined ? String(body.font_family) : template.font_family
+      const headingStyle = body.heading_style !== undefined ? String(body.heading_style) : template.heading_style
 
       const timestamp = nowIso()
       const update = db.prepare(`
         UPDATE templates 
-        SET name = ?, description = ?, rating = ?, uses = ?, layout_type = ?, is_active = ?, popular = ?, new = ?, tag = ?, atsReady = ?, updated_at = ?
+        SET name = ?, description = ?, rating = ?, uses = ?, layout_type = ?, is_active = ?, popular = ?, new = ?, tag = ?, atsReady = ?, primary_color = ?, title_color = ?, text_color = ?, font_family = ?, heading_style = ?, updated_at = ?
         WHERE id = ?
       `)
-      update.run(name, description, rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, timestamp, templateId)
+      update.run(name, description, rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, primaryColor, titleColor, textColor, fontFamily, headingStyle, timestamp, templateId)
       const updatedTemplate = getTemplateById(templateId)
       return sendJson(res, 200, { template: publicTemplate(updatedTemplate) })
     }

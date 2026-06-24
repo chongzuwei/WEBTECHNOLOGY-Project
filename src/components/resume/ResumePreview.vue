@@ -2,27 +2,27 @@
   <div class="resume-preview-wrapper" :style="customStyles">
     <div class="resume-preview-container a4-page" id="resume-preview">
       
-      <div class="resume-header" :class="['align-' + state.theme.headerAlignment]">
+      <div class="resume-header" :class="['align-' + activeTheme.headerAlignment]">
         <h1 class="header-name">{{ state.personal.name || 'Your Name' }}</h1>
         <h2 class="header-title">{{ state.personal.title || 'Professional Title' }}</h2>
         
-        <div :class="['contact-info', 'arrange-' + state.theme.headerDetailsArrangement]">
+        <div :class="['contact-info', 'arrange-' + activeTheme.headerDetailsArrangement]">
           <span v-if="state.personal.email">
-            <span v-if="state.theme.iconStyle === 'emoji'">&#128231;</span>
-            <svg v-if="state.theme.iconStyle === 'solid'" class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-            <span v-if="state.theme.iconStyle === 'outline'" class="icon">&#9993;</span>
+            <span v-if="activeTheme.iconStyle === 'emoji'">&#128231;</span>
+            <svg v-if="activeTheme.iconStyle === 'solid'" class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
+            <span v-if="activeTheme.iconStyle === 'outline'" class="icon">&#9993;</span>
             {{ state.personal.email }}
           </span>
           <span v-if="state.personal.phone">
-            <span v-if="state.theme.iconStyle === 'emoji'">&#128241;</span>
-            <svg v-if="state.theme.iconStyle === 'solid'" class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
-            <span v-if="state.theme.iconStyle === 'outline'" class="icon">&#9990;</span>
+            <span v-if="activeTheme.iconStyle === 'emoji'">&#128241;</span>
+            <svg v-if="activeTheme.iconStyle === 'solid'" class="icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
+            <span v-if="activeTheme.iconStyle === 'outline'" class="icon">&#9990;</span>
             {{ state.personal.phone }}
           </span>
           <span v-if="state.personal.location">
-            <span v-if="state.theme.iconStyle === 'emoji'">&#128205;</span>
-            <svg v-if="state.theme.iconStyle === 'solid'" class="icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-            <span v-if="state.theme.iconStyle === 'outline'" class="icon">&#8962;</span>
+            <span v-if="activeTheme.iconStyle === 'emoji'">&#128205;</span>
+            <svg v-if="activeTheme.iconStyle === 'solid'" class="icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+            <span v-if="activeTheme.iconStyle === 'outline'" class="icon">&#8962;</span>
             {{ state.personal.location }}
           </span>
           <!-- Custom Details -->
@@ -31,9 +31,9 @@
           </span>
           <!-- Social Links -->
           <span v-for="link in state.personal.socialLinks" :key="link.label">
-            <span v-if="state.theme.iconStyle === 'emoji'">&#128279;</span>
-            <svg v-if="state.theme.iconStyle === 'solid'" class="icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/></svg>
-            <span v-if="state.theme.iconStyle === 'outline'" class="icon">&#128279;</span>
+            <span v-if="activeTheme.iconStyle === 'emoji'">&#128279;</span>
+            <svg v-if="activeTheme.iconStyle === 'solid'" class="icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/></svg>
+            <span v-if="activeTheme.iconStyle === 'outline'" class="icon">&#128279;</span>
             {{ link.url }}
           </span>
         </div>
@@ -43,7 +43,7 @@
         <template v-for="section in state.sections" :key="section.id">
           
           <div v-if="section.visible && hasContent(section)" class="resume-section">
-            <h3 class="section-title" :class="[state.theme.headingStyle, state.theme.headingCapitalization]">
+            <h3 class="section-title" :class="[activeTheme.headingStyle, activeTheme.headingCapitalization]">
               <span class="title-text">{{ section.title }}</span>
             </h3>
             
@@ -108,7 +108,36 @@
 import { computed } from 'vue'
 import { useResume } from '@/composables/useResume'
 
+const props = defineProps({
+  themeOverride: {
+    type: Object,
+    default: null
+  }
+})
+
 const { state } = useResume()
+
+const activeTheme = computed(() => {
+  if (props.themeOverride) {
+    const t = props.themeOverride
+    return {
+      primaryColor: t.primary_color || t.primaryColor || '#2563eb',
+      titleColor: t.title_color || t.titleColor || '#2563eb',
+      textColor: t.text_color || t.textColor || '#334155',
+      fontFamily: t.font_family || t.fontFamily || 'Inter',
+      headingStyle: t.heading_style || t.headingStyle || 'underline',
+      headerAlignment: t.header_alignment || t.headerAlignment || 'left',
+      headerDetailsArrangement: t.header_details_arrangement || t.headerDetailsArrangement || 'row',
+      iconStyle: t.icon_style || t.iconStyle || 'solid',
+      lineHeight: t.line_height || t.lineHeight || 1.4,
+      marginX: t.margin_x || t.marginX || 15,
+      marginY: t.margin_y || t.marginY || 15,
+      fontSize: t.fontSize || { base: 10, name: 18, title: 12, headings: 11, entryHeader: 10 },
+      headingCapitalization: t.heading_capitalization || t.headingCapitalization || 'uppercase'
+    }
+  }
+  return state.theme
+})
 
 const formatMonth = (dateStr) => {
   if (!dateStr) return ''
@@ -130,7 +159,7 @@ const hasContent = (section) => {
 }
 
 const customStyles = computed(() => {
-  const t = state.theme
+  const t = activeTheme.value
   return {
     '--theme-font': `"${t.fontFamily}", sans-serif`,
     '--theme-primary': t.primaryColor,
@@ -140,11 +169,11 @@ const customStyles = computed(() => {
     '--theme-margin-x': `${t.marginX}mm`,
     '--theme-margin-y': `${t.marginY}mm`,
     // Apply granular font sizes
-    '--font-size-base': `${t.fontSize.base}pt`,
-    '--font-size-name': `${t.fontSize.name}pt`,
-    '--font-size-title': `${t.fontSize.title}pt`,
-    '--font-size-headings': `${t.fontSize.headings}pt`,
-    '--font-size-entry-header': `${t.fontSize.entryHeader}pt`,
+    '--font-size-base': `${t.fontSize?.base || 10}pt`,
+    '--font-size-name': `${t.fontSize?.name || 18}pt`,
+    '--font-size-title': `${t.fontSize?.title || 12}pt`,
+    '--font-size-headings': `${t.fontSize?.headings || 11}pt`,
+    '--font-size-entry-header': `${t.fontSize?.entryHeader || 10}pt`,
   }
 })
 </script>

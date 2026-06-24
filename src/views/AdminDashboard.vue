@@ -1,7 +1,7 @@
 <template>
   <div class="main-content container admin-dashboard-layout">
     
-    <!-- Header Platform Stats Row (6 KPI blocks) -->
+    <!-- Header Platform Stats Row (5 KPI blocks) -->
     <div class="admin-stats-row">
       <div class="card stat-card">
         <div class="card-icon blue">👥</div>
@@ -14,7 +14,7 @@
       <div class="card stat-card">
         <div class="card-icon green">📁</div>
         <div class="card-details">
-          <span class="val">{{ storeState.versions.length + 5 }}</span>
+          <span class="val">{{ resumes.length }}</span>
           <span class="lbl">Active Resumes</span>
         </div>
       </div>
@@ -40,14 +40,6 @@
         <div class="card-details">
           <span class="val">{{ storeState.previewSessionsCounter }}</span>
           <span class="lbl">Preview Sessions</span>
-        </div>
-      </div>
-
-      <div class="card stat-card">
-        <div class="card-icon pink">💡</div>
-        <div class="card-details">
-          <span class="val">{{ storeState.aiChecklistClicks }}</span>
-          <span class="lbl">AI Suggestion Clicks</span>
         </div>
       </div>
     </div>
@@ -215,21 +207,44 @@
               </span>
 
               <!-- Real-time dynamic CSS mock sheet preview -->
-              <div class="mock-resume-sheet-preview" :class="'mock-sheet-style-' + t.id">
-                <div class="preview-header-mock">
-                  <div class="preview-title-line"></div>
-                  <div class="preview-sub-line"></div>
+              <div class="mock-resume-sheet-preview" :style="{
+                fontFamily: t.font_family || 'Inter',
+                borderColor: t.primary_color || '#cbd5e1'
+              }">
+                <!-- Top header layout: shown for 2-column, single-column, card-layout -->
+                <div v-if="t.layout_type !== 'sidebar'" class="preview-header-mock" :style="{
+                  backgroundColor: t.layout_type === '2-column' || t.layout_type === 'card-layout' ? (t.primary_color + '15') : 'transparent',
+                  alignItems: t.layout_type === 'single-column' ? 'center' : 'flex-start',
+                  borderBottom: '1px solid ' + (t.layout_type === '2-column' || t.layout_type === 'card-layout' ? t.primary_color + '30' : '#f1f5f9'),
+                  paddingBottom: '0.375rem'
+                }">
+                  <div class="preview-title-line" :style="{ backgroundColor: t.title_color || t.primary_color || '#2563eb' }"></div>
+                  <div class="preview-sub-line" :style="{ backgroundColor: (t.title_color || t.primary_color || '#2563eb') + '80' }"></div>
                 </div>
-                <div class="preview-body-mock">
-                  <div class="preview-left-mock-col">
-                    <div class="preview-block-line"></div>
-                    <div class="preview-block-line"></div>
-                    <div class="preview-block-line"></div>
+
+                <div class="preview-body-mock" :style="{
+                  marginTop: t.layout_type === 'sidebar' ? '-0.5rem' : '0'
+                }">
+                  <!-- Left column: shown for 2-column, sidebar -->
+                  <div v-if="t.layout_type === '2-column' || t.layout_type === 'sidebar'" class="preview-left-mock-col" :style="{
+                    backgroundColor: t.layout_type === 'sidebar' ? (t.primary_color || '#0f172a') : 'transparent',
+                    borderRight: t.layout_type === 'sidebar' ? 'none' : '1px solid ' + (t.primary_color + '30'),
+                    padding: t.layout_type === 'sidebar' ? '0.5rem 0.25rem' : '0 0.25rem 0 0',
+                    height: t.layout_type === 'sidebar' ? '100%' : 'auto',
+                    width: t.layout_type === 'sidebar' ? '35%' : '30%'
+                  }">
+                    <div class="preview-block-line" :style="{ backgroundColor: t.layout_type === 'sidebar' ? '#ffffff60' : (t.primary_color || '#93c5fd') }"></div>
+                    <div class="preview-block-line" :style="{ backgroundColor: t.layout_type === 'sidebar' ? '#ffffff60' : (t.primary_color || '#93c5fd') }"></div>
+                    <div class="preview-block-line" :style="{ backgroundColor: t.layout_type === 'sidebar' ? '#ffffff60' : (t.primary_color || '#93c5fd') }"></div>
                   </div>
-                  <div class="preview-right-mock-col">
-                    <div class="preview-block-line long"></div>
-                    <div class="preview-block-line long"></div>
-                    <div class="preview-block-line"></div>
+
+                  <!-- Right column: shown for all -->
+                  <div class="preview-right-mock-col" :style="{
+                    paddingTop: t.layout_type === 'sidebar' ? '0.5rem' : '0'
+                  }">
+                    <div class="preview-block-line long" :style="{ backgroundColor: t.layout_type === 'single-column' ? '#cbd5e1' : '#e2e8f0' }"></div>
+                    <div class="preview-block-line long" :style="{ backgroundColor: t.layout_type === 'single-column' ? '#cbd5e1' : '#e2e8f0' }"></div>
+                    <div class="preview-block-line" :style="{ backgroundColor: '#cbd5e1' }"></div>
                   </div>
                 </div>
               </div>
@@ -318,86 +333,136 @@
         </div>
       </div>
 
-      <!-- Right Side: Edit Template sidebar settings panel -->
-      <div class="template-edit-sidebar card">
-        <div class="sidebar-header-row">
-          <h3>{{ templateSidebarMode === 'add' ? 'Create Template' : 'Edit Template' }}</h3>
-          <span v-if="editingTemplateId" class="active-template-badge">{{ getTemplateName(editingTemplateId) }}</span>
-        </div>
-
-        <div class="sidebar-body-form">
-          <div class="form-group">
-            <label>Template Name</label>
-            <input v-model="templateForm.name" class="form-input" placeholder="e.g. Modern Blue" />
+      <!-- Modal overlay for Edit/Add Template -->
+      <div v-if="templateEditModalVisible" class="modal-overlay" @click="templateEditModalVisible = false">
+        <div class="modal-card template-edit-modal" @click.stop>
+          <div class="modal-header-row">
+            <h3>{{ templateSidebarMode === 'add' ? 'Create Template' : 'Edit Template' }}</h3>
+            <button @click="templateEditModalVisible = false" class="modal-close-x">×</button>
           </div>
+          <div class="modal-body-content scrollable-modal-form" style="max-height: 75vh; overflow-y: auto; display: block; padding: 1.5rem;">
+            
+            <div class="template-edit-modal-grid">
+              <!-- Left column: details -->
+              <div class="modal-form-col" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group">
+                  <label>Template Name</label>
+                  <input v-model="templateForm.name" class="form-input" placeholder="e.g. Modern Blue" />
+                </div>
 
-          <div class="form-group">
-            <label>Description</label>
-            <textarea v-model="templateForm.description" rows="3" class="form-input text-area" placeholder="Template description details..."></textarea>
-          </div>
+                <div class="form-group">
+                  <label>Description</label>
+                  <textarea v-model="templateForm.description" rows="3" class="form-input text-area" placeholder="Template description details..."></textarea>
+                </div>
 
-          <div class="form-group">
-            <label>Layout Style</label>
-            <select v-model="templateForm.layout_type" class="form-input select-styled">
-              <option value="2-column">2-column</option>
-              <option value="single-column">single-column</option>
-              <option value="sidebar">sidebar</option>
-              <option value="card-layout">card-layout</option>
-            </select>
-          </div>
+                <div class="form-group">
+                  <label>Layout Style</label>
+                  <select v-model="templateForm.layout_type" class="form-input select-styled">
+                    <option value="2-column">2-column</option>
+                    <option value="single-column">single-column</option>
+                    <option value="sidebar">sidebar</option>
+                    <option value="card-layout">card-layout</option>
+                  </select>
+                </div>
 
-          <!-- Mock preview image box -->
-          <div class="form-group">
-            <label>Preview Image</label>
-            <div class="preview-upload-placeholder-box">
-              <span class="upload-icon">🖼️</span>
-              <span class="upload-lbl">Click to upload</span>
-              <span class="upload-sub">PNG, JPG up to 2MB</span>
-            </div>
-          </div>
+                <div class="form-group">
+                  <label>Tags</label>
+                  <div class="tags-edit-container">
+                    <div v-for="tag in templateFormTags" :key="tag" class="tag-edit-pill">
+                      {{ tag }}
+                      <span class="remove-tag-x" @click="removeTemplateTag(tag)">×</span>
+                    </div>
+                    <button @click="addTemplateTagPrompt" class="btn-add-tag-pill">+ Add</button>
+                  </div>
+                </div>
 
-          <!-- Dynamic Tags -->
-          <div class="form-group">
-            <label>Tags</label>
-            <div class="tags-edit-container">
-              <div v-for="tag in templateFormTags" :key="tag" class="tag-edit-pill">
-                {{ tag }}
-                <span class="remove-tag-x" @click="removeTemplateTag(tag)">×</span>
+                <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                  <div class="form-group">
+                    <label>Star Rating</label>
+                    <input type="number" step="0.1" min="1" max="5" v-model="templateForm.rating" class="form-input" />
+                  </div>
+                  <div class="form-group">
+                    <label>Uses Counter</label>
+                    <input v-model="templateForm.uses" class="form-input" />
+                  </div>
+                </div>
+
+                <div class="form-group sidebar-status-toggle">
+                  <div class="lbl-details">
+                    <strong>Status</strong>
+                    <p>{{ templateForm.is_active ? 'Active — visible to users' : 'Inactive — hidden from users' }}</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" v-model="templateForm.is_active" />
+                    <span class="slider round"></span>
+                  </label>
+                </div>
               </div>
-              <button @click="addTemplateTagPrompt" class="btn-add-tag-pill">+ Add</button>
+
+              <!-- Right column: Styling & Live Preview -->
+              <div class="modal-style-col" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-group-section-title" style="font-size: 0.85rem; font-weight: 700; border-top: 1px dashed var(--color-border); padding-top: 0.5rem; color: var(--color-text-main);">
+                  🎨 Color Theme & Typography
+                </div>
+
+                <div class="form-row-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                  <div class="form-group">
+                    <label style="font-size: 0.7rem;">Primary</label>
+                    <input type="color" v-model="templateForm.primary_color" style="width: 100%; height: 32px; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; padding: 0;" />
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size: 0.7rem;">Title</label>
+                    <input type="color" v-model="templateForm.title_color" style="width: 100%; height: 32px; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; padding: 0;" />
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size: 0.7rem;">Text</label>
+                    <input type="color" v-model="templateForm.text_color" style="width: 100%; height: 32px; border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; padding: 0;" />
+                  </div>
+                </div>
+
+                <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                  <div class="form-group">
+                    <label style="font-size: 0.7rem;">Font Family</label>
+                    <select v-model="templateForm.font_family" class="form-input select-styled" style="height: 32px; font-size: 0.75rem; padding: 0.25rem;">
+                      <option value="Inter">Inter (Sans-Serif)</option>
+                      <option value="Arial">Arial (Clean)</option>
+                      <option value="Times New Roman">Times New Roman (Formal)</option>
+                      <option value="Georgia">Georgia (Elegant Serif)</option>
+                      <option value="Courier New">Courier New (Monospace)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size: 0.7rem;">Heading Style</label>
+                    <select v-model="templateForm.heading_style" class="form-input select-styled" style="height: 32px; font-size: 0.75rem; padding: 0.25rem;">
+                      <option value="underline">Underline</option>
+                      <option value="border-all">Border All</option>
+                      <option value="bg-fill">Background Fill</option>
+                      <option value="border-top-bottom">Top & Bottom Border</option>
+                      <option value="lines-side">Lines Side</option>
+                      <option value="line-through">Line Through</option>
+                      <option value="dots">Dots Underline</option>
+                      <option value="zigzag">Dashed Underline</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Style Live Preview</label>
+                  <div class="admin-live-preview-box-container">
+                    <div class="admin-live-preview-box-scale">
+                      <ResumePreview :themeOverride="templateForm" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <div v-if="templateSidebarError" class="modal-error-banner" style="margin-top: 1rem;">{{ templateSidebarError }}</div>
           </div>
-
-          <!-- Extra metrics -->
-          <div class="form-row-2">
-            <div class="form-group">
-              <label>Star Rating</label>
-              <input type="number" step="0.1" min="1" max="5" v-model="templateForm.rating" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>Uses Counter</label>
-              <input v-model="templateForm.uses" class="form-input" />
-            </div>
+          <div class="modal-footer-row">
+            <button @click="saveSidebarTemplate" class="btn btn-primary">Save Changes</button>
+            <button @click="cancelSidebarEdit" class="btn btn-secondary">Cancel</button>
           </div>
-
-          <!-- Status toggle switch -->
-          <div class="form-group sidebar-status-toggle">
-            <div class="lbl-details">
-              <strong>Status</strong>
-              <p>{{ templateForm.is_active ? 'Active — visible to users' : 'Inactive — hidden from users' }}</p>
-            </div>
-            <label class="switch">
-              <input type="checkbox" v-model="templateForm.is_active" />
-              <span class="slider round"></span>
-            </label>
-          </div>
-
-          <div v-if="templateSidebarError" class="modal-error-banner">{{ templateSidebarError }}</div>
-        </div>
-
-        <div class="sidebar-footer-row">
-          <button @click="saveSidebarTemplate" class="btn btn-primary">Save Changes</button>
-          <button @click="cancelSidebarEdit" class="btn btn-secondary">Cancel</button>
         </div>
       </div>
     </div>
@@ -629,39 +694,24 @@
 
     <!-- TEMPLATE PREVIEW MODAL (LARGE VIEW) -->
     <div v-if="templatePreviewVisible" class="modal-overlay" @click="templatePreviewVisible = false">
-      <div class="modal-card modal-inspect-card" @click.stop>
+      <div class="modal-card large-preview-modal" @click.stop>
         <div class="modal-header-row">
           <h3>Template Preview: {{ templatePreviewTarget?.name }}</h3>
           <button @click="templatePreviewVisible = false" class="modal-close-x">×</button>
         </div>
-        <div class="modal-body-content flex-column" style="overflow-y: auto; height: calc(80vh - 120px);">
-          <div class="large-mock-sheet-preview" :class="'mock-sheet-style-' + templatePreviewTarget?.id">
-            <div class="preview-header-mock">
-              <div class="preview-title-line"></div>
-              <div class="preview-sub-line"></div>
-            </div>
-            <div class="preview-body-mock">
-              <div class="preview-left-mock-col">
-                <div class="preview-block-line"></div>
-                <div class="preview-block-line"></div>
-                <div class="preview-block-line"></div>
-                <div class="preview-block-line"></div>
-              </div>
-              <div class="preview-right-mock-col">
-                <div class="preview-block-line long"></div>
-                <div class="preview-block-line long"></div>
-                <div class="preview-block-line long"></div>
-                <div class="preview-block-line"></div>
-              </div>
-            </div>
+        <div class="modal-body-content scrollable-preview-content flex-column">
+          <div class="modal-live-preview-container">
+            <ResumePreview :themeOverride="templatePreviewTarget" />
           </div>
-          <p class="tpl-desc-preview" style="font-size: 0.95rem; font-weight: 500; margin-top: 1rem; color: var(--color-text-main);">
-            {{ templatePreviewTarget?.description }}
-          </p>
-          <div class="mini-metrics-pills" style="margin-top: 0.5rem;">
-            <span class="pill-metric passed">Layout Structure: {{ templatePreviewTarget?.layout_type }}</span>
-            <span class="pill-metric warnings">Category: {{ templatePreviewTarget?.tag }}</span>
-            <span class="pill-metric critical" v-if="templatePreviewTarget?.atsReady">✓ ATS Friendly</span>
+          <div class="preview-details-banner" style="width: 100%; max-width: 210mm; margin: 1.5rem auto 0 auto; padding: 1rem; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm);">
+            <p class="tpl-desc-preview" style="font-size: 0.95rem; font-weight: 500; color: var(--color-text-main); margin-bottom: 0.75rem;">
+              {{ templatePreviewTarget?.description }}
+            </p>
+            <div class="mini-metrics-pills">
+              <span class="pill-metric passed" style="background-color: #f1f5f9; color: #334155; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 600; margin-right: 0.5rem; display: inline-block;">Layout Structure: {{ templatePreviewTarget?.layout_type }}</span>
+              <span class="pill-metric warnings" style="background-color: #f1f5f9; color: #334155; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 600; margin-right: 0.5rem; display: inline-block;">Category: {{ templatePreviewTarget?.tag }}</span>
+              <span class="pill-metric critical" v-if="templatePreviewTarget?.atsReady" style="background-color: #f0fdf4; color: #16a34a; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 600; display: inline-block;">✓ ATS Friendly</span>
+            </div>
           </div>
         </div>
         <div class="modal-footer-row">
@@ -674,17 +724,23 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
-import auth from '@/services/auth'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import auth, { apiRequest } from '@/services/auth'
 import { store } from '@/services/store'
+import ResumePreview from '@/components/resume/ResumePreview.vue'
 
 export default {
+  components: {
+    ResumePreview
+  },
   setup() {
     const storeState = store.state
     const activeTab = ref('users')
 
     // Search and Filter variables
     const users = ref([])
+    const resumes = ref([])
+    const isRefreshing = ref(false)
     const userSearchQuery = ref('')
     const userRoleFilter = ref('all')
 
@@ -707,8 +763,9 @@ export default {
     const editingTemplateId = ref(1) // modern blue selected by default
     const templateSidebarMode = ref('edit')
     const templateSidebarError = ref('')
-    const templateForm = ref({ name: '', description: '', rating: 5.0, uses: '0', tag: 'Modern', layout_type: 'single-column', is_active: true, popular: false, new: false, atsReady: true })
+    const templateForm = ref({ name: '', description: '', rating: 5.0, uses: '0', tag: 'Modern', layout_type: 'single-column', is_active: true, popular: false, new: false, atsReady: true, primary_color: '#2563eb', title_color: '#2563eb', text_color: '#334155', font_family: 'Inter', heading_style: 'underline' })
     const templateFormTags = ref([])
+    const templateEditModalVisible = ref(false)
 
     // Inspection Modal states
     const inspectModalVisible = ref(false)
@@ -726,16 +783,49 @@ export default {
       users.value = await auth.getAllUsers()
     }
 
-    onMounted(async () => {
-      void fetchUsers()
+    async function fetchResumes() {
       try {
-        await store.loadTemplates()
+        const payload = await apiRequest('/resumes')
+        resumes.value = payload.resumes || []
       } catch (error) {
-        console.error('Failed to load templates', error)
+        console.error('Failed to fetch resumes', error)
       }
+    }
+
+    async function refreshData() {
+      if (isRefreshing.value) return
+      isRefreshing.value = true
+      try {
+        await Promise.all([
+          fetchUsers(),
+          fetchResumes(),
+          store.loadTemplates()
+        ])
+      } catch (error) {
+        console.error('Failed to refresh data', error)
+      } finally {
+        isRefreshing.value = false
+      }
+    }
+
+    let refreshInterval = null
+
+    onMounted(async () => {
+      await refreshData()
       if (storeState.templates && storeState.templates.length > 0) {
         selectTemplateForEdit(storeState.templates[0])
       }
+      refreshInterval = setInterval(refreshData, 15000)
+    })
+
+    onUnmounted(() => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
+    })
+
+    watch(activeTab, () => {
+      refreshData()
     })
 
     // Dynamic stats computation
@@ -840,7 +930,7 @@ export default {
             role: form.role
           })
           userModalVisible.value = false
-          fetchUsers()
+          await refreshData()
         } catch (e) {
           userModalError.value = e.message
         }
@@ -857,7 +947,7 @@ export default {
           }
           await auth.updateUser(editingUserId.value, updateFields)
           userModalVisible.value = false
-          fetchUsers()
+          await refreshData()
         } catch (e) {
           userModalError.value = e.message
         }
@@ -868,7 +958,7 @@ export default {
       if (confirm('Are you sure you want to delete this user account? All resume metadata will be permanently lost.')) {
         try {
           await auth.deleteUser(id)
-          fetchUsers()
+          await refreshData()
         } catch (e) {
           alert(e.message)
         }
@@ -891,9 +981,15 @@ export default {
         is_active: t.is_active === 1,
         popular: t.popular || false,
         new: t.new || false,
-        atsReady: t.atsReady || false
+        atsReady: t.atsReady || false,
+        primary_color: t.primary_color || '#2563eb',
+        title_color: t.title_color || '#2563eb',
+        text_color: t.text_color || '#334155',
+        font_family: t.font_family || 'Inter',
+        heading_style: t.heading_style || 'underline'
       }
       loadTagsForForm(t)
+      templateEditModalVisible.value = true
     }
 
     function startAddTemplate() {
@@ -911,9 +1007,15 @@ export default {
         is_active: true,
         popular: false,
         new: false,
-        atsReady: true
+        atsReady: true,
+        primary_color: '#2563eb',
+        title_color: '#2563eb',
+        text_color: '#334155',
+        font_family: 'Inter',
+        heading_style: 'underline'
       }
       templateFormTags.value = ['Modern', 'ATS-Friendly']
+      templateEditModalVisible.value = true
     }
 
     async function saveSidebarTemplate() {
@@ -928,7 +1030,12 @@ export default {
         rating: parseFloat(form.rating) || 5.0,
         uses: form.uses,
         layout_type: form.layout_type,
-        is_active: form.is_active ? 1 : 0
+        is_active: form.is_active ? 1 : 0,
+        primary_color: form.primary_color || '#2563eb',
+        title_color: form.title_color || '#2563eb',
+        text_color: form.text_color || '#334155',
+        font_family: form.font_family || 'Inter',
+        heading_style: form.heading_style || 'underline'
       }
       saveTagsFromForm(payload)
 
@@ -940,21 +1047,38 @@ export default {
           const updated = await store.updateTemplate(editingTemplateId.value, payload)
           selectTemplateForEdit(updated)
         }
+        templateEditModalVisible.value = false
+        await refreshData()
       } catch (error) {
         templateSidebarError.value = error.message
       }
     }
 
     function cancelSidebarEdit() {
+      templateEditModalVisible.value = false
       if (editingTemplateId.value) {
         const activeTpl = storeState.templates.find(t => t.id === editingTemplateId.value)
         if (activeTpl) {
-          selectTemplateForEdit(activeTpl)
+          templateForm.value = {
+            name: activeTpl.name,
+            description: activeTpl.description,
+            rating: activeTpl.rating,
+            uses: activeTpl.uses,
+            tag: activeTpl.tag,
+            layout_type: activeTpl.layout_type,
+            is_active: activeTpl.is_active === 1,
+            popular: activeTpl.popular || false,
+            new: activeTpl.new || false,
+            atsReady: activeTpl.atsReady || false,
+            primary_color: activeTpl.primary_color || '#2563eb',
+            title_color: activeTpl.title_color || '#2563eb',
+            text_color: activeTpl.text_color || '#334155',
+            font_family: activeTpl.font_family || 'Inter',
+            heading_style: activeTpl.heading_style || 'underline'
+          }
+          loadTagsForForm(activeTpl)
           return
         }
-      }
-      if (storeState.templates.length > 0) {
-        selectTemplateForEdit(storeState.templates[0])
       }
     }
 
@@ -969,11 +1093,17 @@ export default {
         is_active: t.is_active,
         popular: t.popular || false,
         new: t.new || false,
-        atsReady: t.atsReady || false
+        atsReady: t.atsReady || false,
+        primary_color: t.primary_color || '#2563eb',
+        title_color: t.title_color || '#2563eb',
+        text_color: t.text_color || '#334155',
+        font_family: t.font_family || 'Inter',
+        heading_style: t.heading_style || 'underline'
       }
       try {
         const newTpl = await store.createTemplate(payload)
         selectTemplateForEdit(newTpl)
+        await refreshData()
       } catch (error) {
         templateSidebarError.value = error.message
       }
@@ -991,6 +1121,7 @@ export default {
         if (editingTemplateId.value === tpl.id) {
           templateForm.value.is_active = (updated.is_active === 1)
         }
+        await refreshData()
       } catch (error) {
         templateSidebarError.value = error.message
       }
@@ -998,7 +1129,7 @@ export default {
 
     // User table display helpers
     function getUserResumesCount(userId) {
-      return store.getUserResumes(userId).length
+      return resumes.value.filter(r => r.user_id === userId).length
     }
 
     function getRegistrationDate(u) {
@@ -1035,6 +1166,7 @@ export default {
             editingTemplateId.value = null
             cancelSidebarEdit()
           }
+          await refreshData()
         } catch (error) {
           alert(error.message)
         }
@@ -1075,24 +1207,39 @@ export default {
     }
 
     // Inspect user and resume details modal
-    function openViewUserModal(userObj) {
+    async function openViewUserModal(userObj) {
       inspectUser.value = userObj
-      inspectVersions.value = store.getUserResumes(userObj.id)
-      inspectResumeData.value = store.getUserResumeData(userObj.id)
-      
-      if (inspectVersions.value.length > 0) {
-        selectedInspectVersionId.value = inspectVersions.value[0].id
-        selectedInspectVersion.value = inspectVersions.value[0]
-      } else {
-        selectedInspectVersionId.value = null
-        selectedInspectVersion.value = null
-      }
+      inspectVersions.value = []
+      inspectResumeData.value = null
+      selectedInspectVersionId.value = null
+      selectedInspectVersion.value = null
       inspectModalVisible.value = true
+      
+      try {
+        const payload = await apiRequest(`/users/${userObj.id}/resumes`)
+        const userResumes = payload.resumes || []
+        inspectVersions.value = userResumes.map(r => ({
+          id: r.id,
+          title: r.title,
+          template_id: r.selected_template_id || 1,
+          last_edited: new Date(r.updated_at).toLocaleDateString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric'
+          }),
+          content: r.content
+        }))
+        
+        if (inspectVersions.value.length > 0) {
+          selectInspectVersion(inspectVersions.value[0])
+        }
+      } catch (e) {
+        console.error('Failed to inspect user resumes', e)
+      }
     }
 
     function selectInspectVersion(ver) {
       selectedInspectVersionId.value = ver.id
       selectedInspectVersion.value = ver
+      inspectResumeData.value = ver.content
     }
 
     function formatTimestamp(timestamp) {
@@ -1113,6 +1260,8 @@ export default {
       storeState,
       activeTab,
       users,
+      resumes,
+      refreshData,
       userSearchQuery,
       userRoleFilter,
       templateViewMode,
@@ -1163,6 +1312,7 @@ export default {
       // Large template preview modal
       templatePreviewVisible,
       templatePreviewTarget,
+      templateEditModalVisible,
       // Table column helper variables
       getUserResumesCount,
       getRegistrationDate,
@@ -2038,10 +2188,8 @@ input:checked + .slider:before {
 
 /* Templates Layout section */
 .templates-grid-layout {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 1.5rem;
-  align-items: start;
+  display: block;
+  width: 100%;
 }
 
 @media (max-width: 1024px) {
@@ -2330,6 +2478,19 @@ input:checked + .slider:before {
   max-height: calc(100vh - 120px);
   position: sticky;
   top: 1.5rem;
+}
+
+.template-edit-modal-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .template-edit-modal-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .sidebar-header-row {
@@ -2624,6 +2785,30 @@ input:checked + .slider:before {
 }
 
 /* Upload preview box styles */
+.admin-live-preview-box-container {
+  height: 340px;
+  background-color: #f8fafc;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  position: relative;
+  padding: 0.75rem;
+}
+
+.admin-live-preview-box-scale {
+  width: 210mm;
+  height: 297mm;
+  transform: scale(0.35);
+  transform-origin: top center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+  background-color: white;
+  margin-bottom: -730px;
+}
+
 .preview-upload-placeholder-box {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-sm);
@@ -2677,5 +2862,81 @@ input:checked + .slider:before {
   color: var(--color-text-muted);
   line-height: 1.4;
   margin-top: 0.5rem;
+}
+
+.modal-card.template-edit-modal {
+  max-width: 1050px;
+  width: 95%;
+  max-height: 90vh;
+  height: auto;
+}
+
+.template-edit-modal-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 992px) {
+  .modal-card.template-edit-modal {
+    max-height: 95vh;
+  }
+  .template-edit-modal-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .admin-live-preview-box-container {
+    height: 280px;
+  }
+  .admin-live-preview-box-scale {
+    transform: scale(0.28);
+    margin-bottom: -810px;
+  }
+}
+
+.modal-card.large-preview-modal {
+  max-width: 850px;
+  width: 95%;
+  height: 85vh;
+}
+
+.modal-body-content.scrollable-preview-content {
+  flex: 1;
+  padding: 1.5rem;
+  background-color: #f1f5f9;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.modal-live-preview-container {
+  width: 210mm;
+  height: 297mm;
+  transform: scale(0.85);
+  transform-origin: top center;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  flex-shrink: 0;
+  margin-bottom: -150px;
+}
+
+/* Responsive scale for modal preview */
+@media (max-width: 768px) {
+  .modal-card.large-preview-modal {
+    height: 90vh;
+  }
+  .modal-live-preview-container {
+    transform: scale(0.6);
+    margin-bottom: -450px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-live-preview-container {
+    transform: scale(0.45);
+    margin-bottom: -600px;
+  }
 }
 </style>

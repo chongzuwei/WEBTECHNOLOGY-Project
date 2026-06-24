@@ -484,15 +484,13 @@ export const store = {
     // Sync style configuration to useResume theme
     try {
       const { state: resumeState } = useResume()
-      const templateThemes = {
-        1: { primaryColor: '#2563eb', titleColor: '#2563eb', fontFamily: 'Inter', headingStyle: 'underline' },
-        2: { primaryColor: '#1e293b', titleColor: '#1e293b', fontFamily: 'Georgia', headingStyle: 'border-top-bottom' },
-        3: { primaryColor: '#0f172a', titleColor: '#475569', fontFamily: 'Arial', headingStyle: 'bg-fill' },
-        4: { primaryColor: '#0d9488', titleColor: '#0f766e', fontFamily: 'Inter', headingStyle: 'simple' },
-        5: { primaryColor: '#059669', titleColor: '#065f46', fontFamily: 'Times New Roman', headingStyle: 'lines-side' },
-        6: { primaryColor: '#d97706', titleColor: '#92400e', fontFamily: 'Georgia', headingStyle: 'dots' }
-      }
-      const themePreset = templateThemes[templateId] || templateThemes[1]
+      const themePreset = template ? {
+        primaryColor: template.primary_color || '#2563eb',
+        titleColor: template.title_color || '#2563eb',
+        fontFamily: template.font_family || 'Inter',
+        headingStyle: template.heading_style || 'underline'
+      } : { primaryColor: '#2563eb', titleColor: '#2563eb', fontFamily: 'Inter', headingStyle: 'underline' }
+      
       if (resumeState && resumeState.theme) {
         resumeState.theme.primaryColor = themePreset.primaryColor
         resumeState.theme.titleColor = themePreset.titleColor
@@ -540,15 +538,14 @@ export const store = {
       // Sync style configuration to useResume theme for selected version
       try {
         const { state: resumeState } = useResume()
-        const templateThemes = {
-          1: { primaryColor: '#2563eb', titleColor: '#2563eb', fontFamily: 'Inter', headingStyle: 'underline' },
-          2: { primaryColor: '#1e293b', titleColor: '#1e293b', fontFamily: 'Georgia', headingStyle: 'border-top-bottom' },
-          3: { primaryColor: '#0f172a', titleColor: '#475569', fontFamily: 'Arial', headingStyle: 'bg-fill' },
-          4: { primaryColor: '#0d9488', titleColor: '#0f766e', fontFamily: 'Inter', headingStyle: 'simple' },
-          5: { primaryColor: '#059669', titleColor: '#065f46', fontFamily: 'Times New Roman', headingStyle: 'lines-side' },
-          6: { primaryColor: '#d97706', titleColor: '#92400e', fontFamily: 'Georgia', headingStyle: 'dots' }
-        }
-        const themePreset = templateThemes[ver.template_id] || templateThemes[1]
+        const template = state.templates.find(t => t.id === ver.template_id)
+        const themePreset = template ? {
+          primaryColor: template.primary_color || '#2563eb',
+          titleColor: template.title_color || '#2563eb',
+          fontFamily: template.font_family || 'Inter',
+          headingStyle: template.heading_style || 'underline'
+        } : { primaryColor: '#2563eb', titleColor: '#2563eb', fontFamily: 'Inter', headingStyle: 'underline' }
+        
         if (resumeState && resumeState.theme) {
           resumeState.theme.primaryColor = themePreset.primaryColor
           resumeState.theme.titleColor = themePreset.titleColor

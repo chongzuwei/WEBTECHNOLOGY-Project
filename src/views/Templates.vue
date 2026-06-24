@@ -96,13 +96,8 @@
       
       <!-- Mini Mock Paper image -->
       <div class="side-mock-preview-container">
-        <div class="side-mock-sheet" :class="'mock-bg-' + focusedTemplate.id">
-          <div class="mock-header" :class="'mock-header-style-' + focusedTemplate.id"></div>
-          <div class="mock-body-lines">
-            <div class="mock-line long"></div>
-            <div class="mock-line medium"></div>
-            <div class="mock-line short"></div>
-          </div>
+        <div class="side-live-preview-container">
+          <ResumePreview :themeOverride="focusedTemplate" />
         </div>
       </div>
 
@@ -133,39 +128,14 @@
 
     <!-- Modal dialog for large template preview -->
     <div v-if="previewDialogVisible" class="modal-overlay" @click="previewDialogVisible = false">
-      <div class="modal-card" @click.stop>
+      <div class="modal-card large-preview-modal" @click.stop>
         <div class="modal-header-row">
           <h3>Template Preview: {{ previewTarget.name }}</h3>
           <button @click="previewDialogVisible = false" class="modal-close-x">×</button>
         </div>
-        <div class="modal-body-content">
-          <div class="large-mock-sheet" :class="'mock-bg-' + previewTarget.id">
-            <div class="large-mock-header" :class="'mock-header-style-' + previewTarget.id">
-              <h2>{{ storeState.resumeData.personal.name }}</h2>
-              <p>{{ storeState.resumeData.personal.title }}</p>
-            </div>
-            <div class="large-mock-body">
-              <div class="col-main">
-                <div class="large-mock-section">
-                  <div class="section-header-mock">SUMMARY</div>
-                  <div class="line long"></div>
-                  <div class="line medium"></div>
-                </div>
-                <div class="large-mock-section">
-                  <div class="section-header-mock">EDUCATION</div>
-                  <div class="line long"></div>
-                  <div class="line short"></div>
-                </div>
-              </div>
-              <div class="col-side">
-                <div class="large-mock-section">
-                  <div class="section-header-mock">SKILLS</div>
-                  <div class="chip-mock">React</div>
-                  <div class="chip-mock">TypeScript</div>
-                  <div class="chip-mock">Git</div>
-                </div>
-              </div>
-            </div>
+        <div class="modal-body-content scrollable-preview-content">
+          <div class="modal-live-preview-container">
+            <ResumePreview :themeOverride="previewTarget" />
           </div>
         </div>
         <div class="modal-footer-row">
@@ -182,8 +152,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { store } from '@/services/store'
+import ResumePreview from '@/components/resume/ResumePreview.vue'
 
 export default {
+  components: {
+    ResumePreview
+  },
   setup() {
     const router = useRouter()
     const storeState = store.state
@@ -641,28 +615,27 @@ export default {
 }
 
 .side-mock-preview-container {
-  height: 180px;
+  height: 190px;
   background-color: #f1f5f9;
   border-radius: var(--radius-sm);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   margin-bottom: 1.25rem;
   border: 1px solid var(--color-border);
+  overflow: hidden;
+  position: relative;
 }
 
-.side-mock-sheet {
-  width: 110px;
-  height: 150px;
+.side-live-preview-container {
+  width: 210mm;
+  height: 297mm;
+  transform: scale(0.16);
+  transform-origin: top center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   background-color: white;
-  border-radius: 2px;
-  box-shadow: var(--shadow-md);
-  padding: 0.625rem;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  margin-bottom: -950px;
 }
 
 .side-details-block h3 {
@@ -761,25 +734,50 @@ export default {
   color: var(--color-text-light);
 }
 
-.modal-body-content {
-  padding: 1.5rem;
-  background-color: #f1f5f9;
-  display: flex;
-  justify-content: center;
+.modal-card.large-preview-modal {
+  max-width: 850px;
+  width: 95%;
+  height: 85vh;
 }
 
-.large-mock-sheet {
-  width: 320px;
-  height: 400px;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: var(--shadow-md);
+.modal-body-content.scrollable-preview-content {
+  flex: 1;
   padding: 1.5rem;
+  background-color: #f1f5f9;
+  overflow-y: auto;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  position: relative;
-  overflow: hidden;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.modal-live-preview-container {
+  width: 210mm;
+  height: 297mm;
+  transform: scale(0.85);
+  transform-origin: top center;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  flex-shrink: 0;
+  margin-bottom: -150px;
+}
+
+/* Responsive scale for modal preview */
+@media (max-width: 768px) {
+  .modal-card.large-preview-modal {
+    height: 90vh;
+  }
+  .modal-live-preview-container {
+    transform: scale(0.6);
+    margin-bottom: -450px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-live-preview-container {
+    transform: scale(0.45);
+    margin-bottom: -600px;
+  }
 }
 
 .large-mock-header {
