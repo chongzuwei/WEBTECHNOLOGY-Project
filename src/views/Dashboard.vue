@@ -29,10 +29,6 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
           ATS Score
         </router-link>
-        <router-link to="/insights" class="sidebar-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-          Activity
-        </router-link>
       </div>
     </aside>
 
@@ -46,7 +42,7 @@
           <p>Your resume is {{ completionPercentage }}% complete. Keep going to land your dream job!</p>
         </div>
         <router-link to="/editor" class="btn btn-banner">
-          Continue Editing
+          {{ storeState.versions.length === 0 ? 'Create Resume' : 'Continue Editing' }}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </router-link>
       </div>
@@ -84,32 +80,49 @@
         <div class="card widget-card resumes-list-card">
           <div class="widget-header-row">
             <h3 class="widget-title">My Resumes</h3>
-            <button @click="createNewResume" class="btn-small-new">+ New</button>
+            <button @click="createNewResume" class="btn-small-new" v-if="storeState.versions.length > 0">+ New</button>
           </div>
           
           <div class="resumes-list">
-            <div v-for="ver in storeState.versions" :key="ver.id" class="resume-item-row" :class="{ 'selected-border': ver.selected_for_export }">
-              <div class="resume-item-details" @click="editResume(ver.id)">
-                <div class="resume-file-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <template v-if="storeState.versions.length > 0">
+              <div v-for="ver in storeState.versions" :key="ver.id" class="resume-item-row" :class="{ 'selected-border': ver.selected_for_export }">
+                <div class="resume-item-details" @click="editResume(ver.id)">
+                  <div class="resume-file-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </div>
+                  <div>
+                    <div class="resume-item-title">{{ ver.title }}</div>
+                    <div class="resume-item-subtitle">{{ getTemplateName(ver.template_id) }} • {{ ver.last_edited }}</div>
+                  </div>
                 </div>
-                <div>
-                  <div class="resume-item-title">{{ ver.title }}</div>
-                  <div class="resume-item-subtitle">{{ getTemplateName(ver.template_id) }} • {{ ver.last_edited }}</div>
+                
+                <div class="resume-item-actions">
+                  <button @click="renamePrompt(ver)" class="action-btn" title="Rename">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  </button>
+                  <button @click="duplicateResume(ver.id)" class="action-btn" title="Duplicate">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                  <button @click="deleteResume(ver.id)" class="action-btn delete-btn" title="Delete">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
                 </div>
               </div>
-              
-              <div class="resume-item-actions">
-                <button @click="renamePrompt(ver)" class="action-btn" title="Rename">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                </button>
-                <button @click="duplicateResume(ver.id)" class="action-btn" title="Duplicate">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                </button>
-                <button @click="deleteResume(ver.id)" class="action-btn delete-btn" title="Delete">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                </button>
+            </template>
+            <div v-else class="no-resumes-empty-state">
+              <div class="empty-state-icon">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <circle cx="12" cy="14" r="3"/>
+                  <line x1="12" x2="12" y1="11" y2="11.01"/>
+                </svg>
               </div>
+              <h4 class="empty-state-title">No Resumes Found</h4>
+              <p class="empty-state-desc">You haven't created any resumes yet. Start building a standout profile now to unlock ATS insights and download options.</p>
+              <button @click="createNewResume" class="btn-premium-action">
+                <span>+ Create First Resume</span>
+              </button>
             </div>
           </div>
         </div>
@@ -139,13 +152,13 @@
           <div class="card widget-card ats-score-card">
             <div class="ats-gauge-header">
               <h3 class="widget-title">ATS Score</h3>
-              <span class="ats-score-badge">78</span>
+              <span class="ats-score-badge">{{ atsScore }}</span>
             </div>
             <div class="ats-slider-container">
               <div class="ats-slider-bar">
-                <div class="ats-slider-progress" style="width: 78%"></div>
+                <div class="ats-slider-progress" :style="'width: ' + atsScore + '%'"></div>
               </div>
-              <div class="ats-slider-label">Good • Add keywords to improve</div>
+              <div class="ats-slider-label">{{ atsScoreLabel }}</div>
             </div>
           </div>
         </div>
@@ -178,33 +191,14 @@
         <div class="card bottom-card template-stats-card">
           <h3 class="widget-title">Template Usage Stats</h3>
           <div class="template-stats-list">
-            <div class="template-stat-row">
+            <div v-for="stat in templateUsageStats.slice(0, 4)" :key="stat.name" class="template-stat-row">
               <div class="template-stat-info">
-                <span>Modern Blue</span>
-                <span>45%</span>
+                <span>{{ stat.name }}</span>
+                <span>{{ stat.percent }}%</span>
               </div>
-              <div class="stat-progress-bar"><div class="stat-progress-fill" style="width: 45%; background-color: var(--color-primary)"></div></div>
-            </div>
-            <div class="template-stat-row">
-              <div class="template-stat-info">
-                <span>Classic White</span>
-                <span>30%</span>
+              <div class="stat-progress-bar">
+                <div class="stat-progress-fill" :style="`width: ${stat.percent}%; background-color: ${stat.color}`"></div>
               </div>
-              <div class="stat-progress-bar"><div class="stat-progress-fill" style="width: 30%; background-color: var(--color-success)"></div></div>
-            </div>
-            <div class="template-stat-row">
-              <div class="template-stat-info">
-                <span>Simple Dark</span>
-                <span>15%</span>
-              </div>
-              <div class="stat-progress-bar"><div class="stat-progress-fill" style="width: 15%; background-color: #6366f1"></div></div>
-            </div>
-            <div class="template-stat-row">
-              <div class="template-stat-info">
-                <span>Creative Teal</span>
-                <span>10%</span>
-              </div>
-              <div class="stat-progress-bar"><div class="stat-progress-fill" style="width: 10%; background-color: #0d9488"></div></div>
             </div>
           </div>
 
@@ -219,7 +213,7 @@
               <span class="metric-lbl">Exports</span>
             </div>
             <div class="metric-block">
-              <span class="metric-val">78</span>
+              <span class="metric-val">{{ atsScore }}</span>
               <span class="metric-lbl">ATS Score</span>
             </div>
           </div>
@@ -261,6 +255,72 @@ export default {
       return score
     })
 
+    // ATS Score dynamic calculation
+    const matchKeywords = computed(() => {
+      const matchWords = ['react', 'javascript', 'typescript', 'css', 'tailwind', 'git', 'node']
+      const currentSkills = storeState.resumeData.skills.map(s => (s.skill_name || '').toLowerCase())
+      return matchWords.filter(w => currentSkills.some(cs => cs.includes(w)))
+    })
+
+    const keywordMatchScore = computed(() => {
+      return matchKeywords.value.length >= 4 ? 85 : matchKeywords.value.length >= 2 ? 65 : 35
+    })
+
+    const formatStructureScore = computed(() => {
+      let score = 50
+      if (hasPersonal.value) score += 15
+      if (hasEducation.value) score += 15
+      if (hasExperience.value) score += 15
+      if (storeState.resumeData.selected_template_id === 1 || storeState.resumeData.selected_template_id === 2 || storeState.resumeData.selected_template_id === 5) {
+        score += 5
+      }
+      return score
+    })
+
+    const quantifiedImpactScore = computed(() => {
+      let foundNumbers = false
+      storeState.resumeData.experience.forEach(exp => {
+        if (exp.description && /\d+/.test(exp.description)) {
+          foundNumbers = true
+        }
+      })
+      return foundNumbers ? 85 : 45
+    })
+
+    const atsScore = computed(() => {
+      return Math.round((keywordMatchScore.value + formatStructureScore.value + quantifiedImpactScore.value) / 3)
+    })
+
+    const atsScoreLabel = computed(() => {
+      if (atsScore.value >= 85) return 'Excellent • Highly competitive'
+      if (atsScore.value >= 70) return 'Good • Add keywords to improve'
+      return 'Needs Review • Add content sections'
+    })
+
+    // Template usage statistics based on active versions
+    const templateUsageStats = computed(() => {
+      const versions = storeState.versions || []
+      const total = versions.length || 1
+      
+      const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+      versions.forEach(v => {
+        if (counts[v.template_id] !== undefined) {
+          counts[v.template_id]++
+        } else {
+          counts[1]++
+        }
+      })
+
+      return [
+        { name: 'Modern Blue', percent: Math.round((counts[1] / total) * 100), color: 'var(--color-primary)' },
+        { name: 'Classic White', percent: Math.round((counts[2] / total) * 100), color: 'var(--color-success)' },
+        { name: 'Slate Premium', percent: Math.round((counts[3] / total) * 100), color: '#6366f1' },
+        { name: 'Teal Compact', percent: Math.round((counts[4] / total) * 100), color: '#0d9488' },
+        { name: 'Emerald Executive', percent: Math.round((counts[5] / total) * 100), color: '#10b981' },
+        { name: 'Warm Amber', percent: Math.round((counts[6] / total) * 100), color: '#f59e0b' }
+      ].sort((a, b) => b.percent - a.percent)
+    })
+
     function getTemplateName(id) {
       const t = store.templates.find(x => x.id === id)
       return t ? t.name : 'Classic White'
@@ -271,8 +331,8 @@ export default {
       router.push('/editor')
     }
 
-    function createNewResume() {
-      const newVer = store.createNewVersion(`Resume #${storeState.versions.length + 1}`)
+    async function createNewResume() {
+      const newVer = await store.createNewVersion(`Resume #${storeState.versions.length + 1}`)
       store.selectVersionForExport(newVer.id)
       router.push('/editor')
     }
@@ -282,10 +342,6 @@ export default {
     }
 
     function deleteResume(id) {
-      if (storeState.versions.length <= 1) {
-        alert('You must keep at least one resume version.')
-        return
-      }
       if (confirm('Are you sure you want to delete this resume version?')) {
         store.deleteVersion(id)
       }
@@ -311,7 +367,10 @@ export default {
       createNewResume,
       duplicateResume,
       deleteResume,
-      renamePrompt
+      renamePrompt,
+      atsScore,
+      atsScoreLabel,
+      templateUsageStats
     }
   }
 }
@@ -321,61 +380,6 @@ export default {
 /* Grid settings */
 .dashboard-grid {
   margin-top: 1.5rem;
-}
-
-.sidebar-panel {
-  background-color: white;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  padding: 1.5rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  height: max-content;
-}
-
-.sidebar-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.sidebar-section-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--color-text-light);
-  letter-spacing: 0.1em;
-  padding-left: 0.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-
-.sidebar-link:hover {
-  background-color: #f8fafc;
-  color: var(--color-primary);
-}
-
-.sidebar-link.active {
-  background-color: var(--color-primary-light);
-  color: var(--color-primary);
-}
-
-.dashboard-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
 }
 
 /* Welcome Banner card */
@@ -808,5 +812,81 @@ export default {
   font-weight: 600;
   color: var(--color-text-muted);
   text-transform: uppercase;
+}
+
+/* ─── PREMIUM EMPTY STATE ─── */
+.no-resumes-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: #fafbfc;
+  transition: all var(--transition-fast);
+  margin: 0.25rem 0;
+}
+
+.no-resumes-empty-state:hover {
+  border-color: var(--color-primary);
+  background-color: #f8fafc;
+}
+
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  transition: transform var(--transition-fast);
+}
+
+.no-resumes-empty-state:hover .empty-state-icon {
+  transform: scale(1.05);
+}
+
+.empty-state-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin-bottom: 0.5rem;
+  font-family: var(--font-brand);
+}
+
+.empty-state-desc {
+  font-size: 0.775rem;
+  color: var(--color-text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.btn-premium-action {
+  border: none;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #1d4ed8 100%);
+  color: white;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.825rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+  transition: all var(--transition-fast);
+}
+
+.btn-premium-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
+}
+
+.btn-premium-action:active {
+  transform: translateY(1px);
 }
 </style>

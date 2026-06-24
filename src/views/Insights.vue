@@ -1,19 +1,56 @@
 <template>
-  <div class="main-content container insights-page-layout">
+  <div class="main-content container dashboard-grid">
     
-    <!-- Top Header -->
-    <div class="insights-header no-print">
-      <div>
-        <h2>Resume Insights</h2>
-        <p>Improve your resume's impact and track your activity.</p>
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar-panel no-print">
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">MAIN</span>
+        <router-link to="/" class="sidebar-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          Dashboard
+        </router-link>
+        <router-link to="/editor" class="sidebar-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          My Resumes
+        </router-link>
+        <router-link to="/templates" class="sidebar-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          Templates
+        </router-link>
+        <router-link to="/versions" class="sidebar-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          Export
+        </router-link>
       </div>
-      <div class="analyzing-selector">
-        <span class="lbl">Analyzing:</span>
-        <select v-model="selectedVersionId" @change="onVersionChange" class="dropdown-ver-select">
-          <option v-for="ver in storeState.versions" :key="ver.id" :value="ver.id">{{ ver.title }}</option>
-        </select>
+
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">INSIGHTS</span>
+        <router-link to="/insights" class="sidebar-link active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          ATS Score
+        </router-link>
       </div>
-    </div>
+    </aside>
+
+    <!-- Main Insights Body -->
+    <div class="dashboard-body">
+      
+      <!-- Top Header -->
+      <div class="insights-header no-print">
+        <div>
+          <h2>Resume Insights</h2>
+          <p>Improve your resume's impact and track your activity.</p>
+        </div>
+        <div class="analyzing-selector">
+          <span class="lbl">Analyzing:</span>
+          <select v-model="selectedVersionId" @change="onVersionChange" class="dropdown-ver-select">
+            <option v-for="ver in storeState.versions" :key="ver.id" :value="ver.id">{{ ver.title }}</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Columns Grid -->
+      <div class="insights-content-grid">
 
     <!-- Left Column: ATS Score Wheel & checklist -->
     <div class="insights-left-col">
@@ -153,7 +190,6 @@
       <div class="card dark-statistics-card">
         <div class="dark-card-header">
           <span class="lbl-light">Platform Statistics</span>
-          <router-link to="/settings" class="admin-view-btn">Admin View</router-link>
         </div>
 
         <div class="dark-stats-grid">
@@ -177,8 +213,10 @@
         </div>
       </div>
 
-    </div>
+      </div>
 
+    </div>
+    </div>
   </div>
 </template>
 
@@ -332,11 +370,10 @@ export default {
 </script>
 
 <style scoped>
-.insights-page-layout {
+.insights-content-grid {
   display: grid;
   grid-template-columns: 1fr 360px;
   gap: 1.5rem;
-  margin-top: 1.5rem;
 }
 
 .insights-header {

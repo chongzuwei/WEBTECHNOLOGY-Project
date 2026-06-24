@@ -2,36 +2,123 @@ const http = require('http')
 const path = require('path')
 const fs = require('fs')
 const crypto = require('crypto')
+const Database = require('better-sqlite3')
 
 const PORT = process.env.PORT || 3000
-const DATA_DIR = path.join(__dirname, 'data')
-const USERS_PATH = path.join(DATA_DIR, 'users.json')
-const TEMPLATES_PATH = path.join(DATA_DIR, 'templates.json')
-const RESUMES_PATH = path.join(DATA_DIR, 'resumes.json')
+const DB_PATH = path.join(__dirname, 'database.sqlite')
+const db = new Database(DB_PATH)
 
-const sessions = new Map()
+// Enable foreign key support
+db.pragma('foreign_keys = ON')
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true })
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'maxcv-super-secret-key-2026-auth'
+
+// ─── JWT SIGNING & VERIFICATION (HS256) ───
+function base64url(buf) {
+  return buf.toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function base64urlDecode(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (str.length % 4) {
+    str += '='
+  }
+  return Buffer.from(str, 'base64').toString('utf8')
+}
+
+function generateJwt(payload) {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const part1 = base64url(Buffer.from(JSON.stringify(header)))
+  const part2 = base64url(Buffer.from(JSON.stringify({
+    ...payload,
+    exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60 // 24 Hours
+  })))
+  
+  const signatureInput = `${part1}.${part2}`
+  const signature = crypto.createHmac('sha256', JWT_SECRET)
+    .update(signatureInput)
+    .digest()
+  const part3 = base64url(signature)
+  return `${signatureInput}.${part3}`
+}
+
+function verifyJwt(token) {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [part1, part2, part3] = parts
+    
+    const signatureInput = `${part1}.${part2}`
+    const expectedSignature = base64url(
+      crypto.createHmac('sha256', JWT_SECRET)
+        .update(signatureInput)
+        .digest()
+    )
+    if (part3 !== expectedSignature) return null
+    
+    const payload = JSON.parse(base64urlDecode(part2))
+    if (payload.exp && Date.now() / 1000 > payload.exp) {
+      return null // Expired
+    }
+    return payload
+  } catch {
+    return null
   }
 }
 
-function readJson(filePath, fallback = []) {
-  ensureDataDir()
-  if (!fs.existsSync(filePath)) {
-    writeJson(filePath, fallback)
-    return fallback
-  }
-  const raw = fs.readFileSync(filePath, 'utf8')
-  return raw ? JSON.parse(raw) : fallback
+// ─── INITIALIZE DATABASE TABLES ───
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    rating REAL DEFAULT 5.0,
+    uses TEXT DEFAULT '0',
+    layout_type TEXT,
+    is_active INTEGER DEFAULT 1,
+    popular INTEGER DEFAULT 0,
+    new INTEGER DEFAULT 0,
+    tag TEXT DEFAULT 'Modern',
+    atsReady INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS resumes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    selected_template_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`)
+
+// Migration: Add content column to resumes table if it does not exist
+try {
+  db.prepare("SELECT content FROM resumes LIMIT 1").get()
+} catch (e) {
+  db.exec("ALTER TABLE resumes ADD COLUMN content TEXT")
 }
 
-function writeJson(filePath, data) {
-  ensureDataDir()
-  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`)
-}
-
+// ─── HELPERS ───
 function nowIso() {
   return new Date().toISOString()
 }
@@ -46,10 +133,6 @@ function verifyPassword(password, storedHash) {
   const [salt, hash] = storedHash.split(':')
   const derived = crypto.scryptSync(String(password), salt, 64).toString('hex')
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(derived, 'hex'))
-}
-
-function nextId(records) {
-  return records.length ? Math.max(...records.map(record => Number(record.id) || 0)) + 1 : 1
 }
 
 function sendJson(res, statusCode, payload) {
@@ -88,6 +171,24 @@ function readBody(req) {
   })
 }
 
+// ─── DB OPERATIONS ───
+function getUserById(id) {
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id)) || null
+}
+
+function getUserByEmail(email) {
+  const normalized = String(email || '').trim().toLowerCase()
+  return db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(normalized) || null
+}
+
+function getTemplateById(id) {
+  return db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(id)) || null
+}
+
+function getResumeById(id) {
+  return db.prepare('SELECT * FROM resumes WHERE id = ?').get(Number(id)) || null
+}
+
 function publicUser(user) {
   if (!user) return null
   return {
@@ -121,24 +222,28 @@ function publicTemplate(template) {
 }
 
 function publicResume(resume) {
+  if (!resume) return null
   return {
     id: resume.id,
     user_id: resume.user_id,
     title: resume.title,
     summary: resume.summary || null,
     selected_template_id: resume.selected_template_id || null,
+    content: resume.content ? (typeof resume.content === 'string' ? JSON.parse(resume.content) : resume.content) : null,
     created_at: resume.created_at,
     updated_at: resume.updated_at
   }
 }
 
+// ─── DATABASE SEEDING ───
 function seedData() {
-  ensureDataDir()
-  if (fs.existsSync(USERS_PATH) && fs.existsSync(TEMPLATES_PATH) && fs.existsSync(RESUMES_PATH)) return
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get().count
+  if (userCount > 0) return
 
   const timestamp = '2026-05-01T08:00:00.000Z'
   const seedPassword = hashPassword('password', 'seed-salt')
 
+  // Seed Users
   const users = [
     { id: 103, name: 'Sarah Reid', email: 'admin@maxcv.com', role: 'admin' },
     { id: 124, name: 'Alex Chen', email: 'alex.chen@example.com', role: 'student' },
@@ -147,92 +252,69 @@ function seedData() {
     { id: 127, name: 'Maya Lee', email: 'maya.lee@gmail.com', role: 'student' },
     { id: 128, name: 'David Kim', email: 'd.kim@techuni.edu', role: 'student' },
     { id: 129, name: 'Lily Park', email: 'lily.park@design.edu', role: 'student' }
-  ].map(user => ({
-    ...user,
-    password_hash: seedPassword,
-    avatar_url: null,
-    created_at: timestamp,
-    updated_at: timestamp
-  }))
+  ]
 
+  const insertUser = db.prepare(`
+    INSERT INTO users (id, name, email, role, password_hash, avatar_url, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
+  `)
+
+  db.transaction(() => {
+    for (const u of users) {
+      insertUser.run(u.id, u.name, u.email, u.role, seedPassword, timestamp, timestamp)
+    }
+  })()
+
+  // Seed Templates
   const templates = [
-    { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: true, new: false, tag: 'Modern', atsReady: true },
-    { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, popular: false, new: false, tag: 'Classic', atsReady: true },
-    { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, popular: false, new: true, tag: 'Minimal', atsReady: false },
-    { id: 4, name: 'Creative Teal', description: 'Vibrant teal accents and unique timeline layout, perfect for UI/UX and product designers.', rating: 4.9, uses: '1,100', layout_type: '2-column', is_active: 1, popular: false, new: false, tag: 'Creative', atsReady: false },
-    { id: 5, name: 'Clean Green', description: 'Minimalist layout accented with soft forest green elements and sans-serif typography.', rating: 4.6, uses: '654', layout_type: 'single-column', is_active: 1, popular: false, new: false, tag: 'Modern', atsReady: true },
-    { id: 6, name: 'Warm Amber', description: 'Card-based content grouping with a warm amber palette for business and creative jobs.', rating: 4.5, uses: '432', layout_type: 'card-layout', is_active: 1, popular: false, new: false, tag: 'Creative', atsReady: true }
-  ].map(template => ({ ...template, created_at: timestamp, updated_at: timestamp }))
+    { id: 1, name: 'Modern Blue', description: 'Clean 2-column layout with a bold blue header. Perfect for tech roles and modern companies.', rating: 4.9, uses: '2,300', layout_type: '2-column', is_active: 1, popular: 1, new: 0, tag: 'Modern', atsReady: 1 },
+    { id: 2, name: 'Elegant Classic', description: 'Serif-based single-column template focusing on standard typography and readable margins.', rating: 4.7, uses: '1,800', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Classic', atsReady: 1 },
+    { id: 3, name: 'Simple Dark', description: 'Modern dark theme design with high-contrast sections and left sidebar layout.', rating: 4.8, uses: '987', layout_type: 'sidebar', is_active: 1, popular: 0, new: 1, tag: 'Minimal', atsReady: 0 },
+    { id: 4, name: 'Creative Teal', description: 'Vibrant teal accents and unique timeline layout, perfect for UI/UX and product designers.', rating: 4.9, uses: '1,100', layout_type: '2-column', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 0 },
+    { id: 5, name: 'Clean Green', description: 'Minimalist layout accented with soft forest green elements and sans-serif typography.', rating: 4.6, uses: '654', layout_type: 'single-column', is_active: 1, popular: 0, new: 0, tag: 'Modern', atsReady: 1 },
+    { id: 6, name: 'Warm Amber', description: 'Card-based content grouping with a warm amber palette for business and creative jobs.', rating: 4.5, uses: '432', layout_type: 'card-layout', is_active: 1, popular: 0, new: 0, tag: 'Creative', atsReady: 1 }
+  ]
 
+  const insertTemplate = db.prepare(`
+    INSERT INTO templates (id, name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  db.transaction(() => {
+    for (const t of templates) {
+      insertTemplate.run(t.id, t.name, t.description, t.rating, t.uses, t.layout_type, t.is_active, t.popular, t.new, t.tag, t.atsReady, timestamp, timestamp)
+    }
+  })()
+
+  // Seed Resumes
   const resumes = [
     { id: 1, user_id: 124, title: 'Frontend Developer v1', summary: 'Passionate frontend developer focused on React, Vue, and modern CSS.', selected_template_id: 1 },
     { id: 2, user_id: 124, title: 'Frontend Developer v2', summary: 'A second draft with tighter experience and stronger project framing.', selected_template_id: 2 },
     { id: 3, user_id: 125, title: 'Internship Resume', summary: 'Resume draft for internship applications with coursework and project focus.', selected_template_id: 1 }
-  ].map(resume => ({ ...resume, created_at: timestamp, updated_at: timestamp }))
+  ]
 
-  if (!fs.existsSync(USERS_PATH)) writeJson(USERS_PATH, users)
-  if (!fs.existsSync(TEMPLATES_PATH)) writeJson(TEMPLATES_PATH, templates)
-  if (!fs.existsSync(RESUMES_PATH)) writeJson(RESUMES_PATH, resumes)
+  const insertResume = db.prepare(`
+    INSERT INTO resumes (id, user_id, title, summary, selected_template_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `)
+
+  db.transaction(() => {
+    for (const r of resumes) {
+      insertResume.run(r.id, r.user_id, r.title, r.summary, r.selected_template_id, timestamp, timestamp)
+    }
+  })()
 }
 
-function getUsers() {
-  return readJson(USERS_PATH)
-}
+seedData()
 
-function saveUsers(users) {
-  writeJson(USERS_PATH, users)
-}
-
-function getTemplates() {
-  return readJson(TEMPLATES_PATH)
-}
-
-function saveTemplates(templates) {
-  writeJson(TEMPLATES_PATH, templates)
-}
-
-function getResumes() {
-  return readJson(RESUMES_PATH)
-}
-
-function saveResumes(resumes) {
-  writeJson(RESUMES_PATH, resumes)
-}
-
-function getUserByEmail(email) {
-  const normalized = String(email || '').trim().toLowerCase()
-  return getUsers().find(user => user.email.toLowerCase() === normalized) || null
-}
-
-function getUserById(id) {
-  return getUsers().find(user => user.id === Number(id)) || null
-}
-
-function getTemplateById(id) {
-  return getTemplates().find(template => template.id === Number(id)) || null
-}
-
-function getResumeById(id) {
-  return getResumes().find(resume => resume.id === Number(id)) || null
-}
-
-function createSession(userId) {
-  const token = crypto.randomBytes(24).toString('hex')
-  sessions.set(token, Number(userId))
-  return token
-}
-
-function removeSession(token) {
-  if (token) sessions.delete(token)
-}
-
+// ─── AUTHENTICATION MIDDLEWARE ───
 function getAuthenticatedUser(req) {
   const header = req.headers.authorization || ''
   if (!header.startsWith('Bearer ')) return null
   const token = header.slice(7).trim()
-  const userId = sessions.get(token)
-  if (!userId) return null
-  return getUserById(userId)
+  const payload = verifyJwt(token)
+  if (!payload || !payload.id) return null
+  return getUserById(payload.id)
 }
 
 function requireAuth(req, res) {
@@ -256,178 +338,13 @@ function userOwnsRecord(user, ownerId) {
   return user.role === 'admin' || user.id === Number(ownerId)
 }
 
-function createUserRecord(body, roleOverride = null) {
-  const users = getUsers()
-  const timestamp = nowIso()
-  const user = {
-    id: nextId(users),
-    name: String(body.name || '').trim(),
-    email: String(body.email || '').trim(),
-    password_hash: hashPassword(String(body.password || '')),
-    role: roleOverride || (body.role === 'admin' ? 'admin' : 'student'),
-    avatar_url: body.avatar_url || null,
-    created_at: timestamp,
-    updated_at: timestamp
-  }
-  users.push(user)
-  saveUsers(users)
-  return user
+// ─── VALIDATION HELPERS ───
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(String(email).trim())
 }
 
-function updateUserRecord(id, body, authUser) {
-  const users = getUsers()
-  const idx = users.findIndex(user => user.id === Number(id))
-  if (idx === -1) return null
-  const user = users[idx]
-  if (!userOwnsRecord(authUser, user.id)) return 'forbidden'
-
-  if (body.email !== undefined) {
-    const nextEmail = String(body.email).trim()
-    const conflict = users.find(entry => entry.email.toLowerCase() === nextEmail.toLowerCase() && entry.id !== user.id)
-    if (conflict) return 'email_conflict'
-  }
-
-  if (body.password && authUser.role !== 'admin') {
-    if (!body.currentPassword || !verifyPassword(body.currentPassword, user.password_hash)) {
-      return 'password_invalid'
-    }
-  }
-
-  users[idx] = {
-    ...user,
-    name: body.name !== undefined ? String(body.name).trim() || user.name : user.name,
-    email: body.email !== undefined ? String(body.email).trim() || user.email : user.email,
-    role: body.role !== undefined && authUser.role === 'admin' ? (body.role === 'admin' ? 'admin' : 'student') : user.role,
-    avatar_url: body.avatar_url !== undefined ? body.avatar_url || null : user.avatar_url,
-    password_hash: body.password ? hashPassword(String(body.password)) : user.password_hash,
-    updated_at: nowIso()
-  }
-  saveUsers(users)
-  return users[idx]
-}
-
-function deleteUserRecord(id) {
-  const userId = Number(id)
-  saveUsers(getUsers().filter(user => user.id !== userId))
-  saveResumes(getResumes().filter(resume => resume.user_id !== userId))
-}
-
-function createResumeRecord(userId, body = {}) {
-  const resumes = getResumes()
-  const timestamp = nowIso()
-  const resume = {
-    id: nextId(resumes),
-    user_id: Number(userId),
-    title: String(body.title || 'Untitled Resume'),
-    summary: body.summary !== undefined ? String(body.summary) : null,
-    selected_template_id: body.selected_template_id ? Number(body.selected_template_id) : null,
-    created_at: timestamp,
-    updated_at: timestamp
-  }
-  resumes.push(resume)
-  saveResumes(resumes)
-  return resume
-}
-
-function updateResumeRecord(id, body, authUser) {
-  const resumes = getResumes()
-  const idx = resumes.findIndex(resume => resume.id === Number(id))
-  if (idx === -1) return null
-
-  const resume = resumes[idx]
-  if (!userOwnsRecord(authUser, resume.user_id)) return 'forbidden'
-
-  if (body.selected_template_id !== undefined && body.selected_template_id !== null && body.selected_template_id !== '') {
-    if (!getTemplateById(body.selected_template_id)) return 'template_not_found'
-  }
-
-  resumes[idx] = {
-    ...resume,
-    title: body.title !== undefined ? String(body.title).trim() || resume.title : resume.title,
-    summary: body.summary !== undefined ? (body.summary === null ? null : String(body.summary)) : resume.summary,
-    selected_template_id: body.selected_template_id !== undefined
-      ? (body.selected_template_id ? Number(body.selected_template_id) : null)
-      : resume.selected_template_id,
-    updated_at: nowIso()
-  }
-  saveResumes(resumes)
-  return resumes[idx]
-}
-
-function deleteResumeRecord(id, authUser) {
-  const resumes = getResumes()
-  const resume = resumes.find(entry => entry.id === Number(id))
-  if (!resume) return null
-  if (!userOwnsRecord(authUser, resume.user_id)) return 'forbidden'
-
-  saveResumes(resumes.filter(entry => entry.id !== Number(id)))
-  return true
-}
-
-function normalizeTemplateBody(body, existing = {}) {
-  return {
-    name: body.name !== undefined ? String(body.name).trim() : existing.name,
-    description: body.description !== undefined ? String(body.description) : existing.description,
-    rating: body.rating !== undefined ? Number(body.rating) || 5 : existing.rating,
-    uses: body.uses !== undefined ? String(body.uses) : existing.uses,
-    layout_type: body.layout_type !== undefined ? String(body.layout_type) : existing.layout_type,
-    is_active: body.is_active !== undefined ? (Number(body.is_active) === 0 ? 0 : 1) : existing.is_active,
-    popular: body.popular !== undefined ? Boolean(body.popular) : Boolean(existing.popular),
-    new: body.new !== undefined ? Boolean(body.new) : Boolean(existing.new),
-    tag: body.tag !== undefined ? String(body.tag || 'Modern') : existing.tag,
-    atsReady: body.atsReady !== undefined ? Boolean(body.atsReady) : Boolean(existing.atsReady)
-  }
-}
-
-function createTemplateRecord(body) {
-  const templates = getTemplates()
-  const timestamp = nowIso()
-  const template = {
-    id: nextId(templates),
-    ...normalizeTemplateBody(body, {
-      name: 'Untitled Template',
-      description: '',
-      rating: 5,
-      uses: '0',
-      layout_type: 'single-column',
-      is_active: 1,
-      popular: false,
-      new: false,
-      tag: 'Modern',
-      atsReady: false
-    }),
-    created_at: timestamp,
-    updated_at: timestamp
-  }
-  templates.push(template)
-  saveTemplates(templates)
-  return template
-}
-
-function updateTemplateRecord(id, body) {
-  const templates = getTemplates()
-  const idx = templates.findIndex(template => template.id === Number(id))
-  if (idx === -1) return null
-  templates[idx] = {
-    ...templates[idx],
-    ...normalizeTemplateBody(body, templates[idx]),
-    updated_at: nowIso()
-  }
-  saveTemplates(templates)
-  return templates[idx]
-}
-
-function deleteTemplateRecord(id) {
-  const templateId = Number(id)
-  const templates = getTemplates()
-  const exists = templates.some(template => template.id === templateId)
-  if (!exists) return false
-  saveTemplates(templates.filter(template => template.id !== templateId))
-  return true
-}
-
-seedData()
-
+// ─── REQUEST HANDLER ───
 async function handleRequest(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -443,52 +360,97 @@ async function handleRequest(req, res) {
   const { pathname } = requestUrl
 
   try {
+    // Health Check
     if (req.method === 'GET' && pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true, storage: 'json' })
+      return sendJson(res, 200, { ok: true, storage: 'sqlite' })
     }
 
+    // Register User
     if (req.method === 'POST' && pathname === '/api/auth/register') {
       const body = await readBody(req)
       const name = String(body.name || '').trim()
       const email = String(body.email || '').trim()
       const password = String(body.password || '')
-      if (!name || !email || !password) return sendError(res, 400, 'Name, email, and password are required')
-      if (getUserByEmail(email)) return sendError(res, 409, 'Email already registered')
 
-      const user = createUserRecord({ name, email, password }, 'student')
-      const resume = createResumeRecord(user.id, { title: `${user.name}'s Resume`, selected_template_id: 1 })
-      const token = createSession(user.id)
+      if (!name || !email || !password) {
+        return sendError(res, 400, 'Name, email, and password are required')
+      }
+      if (!isValidEmail(email)) {
+        return sendError(res, 400, 'Invalid email format')
+      }
+      if (password.length < 6) {
+        return sendError(res, 400, 'Password must be at least 6 characters long')
+      }
+
+      if (getUserByEmail(email)) {
+        return sendError(res, 409, 'Email already registered')
+      }
+
+      const timestamp = nowIso()
+      const passwordHash = hashPassword(password)
+      
+      const insert = db.prepare(`
+        INSERT INTO users (name, email, role, password_hash, created_at, updated_at)
+        VALUES (?, ?, 'student', ?, ?, ?)
+      `)
+      
+      const result = insert.run(name, email, passwordHash, timestamp, timestamp)
+      const userId = result.lastInsertRowid
+      const user = getUserById(userId)
+
+      // Create initial default resume
+      const insertResume = db.prepare(`
+        INSERT INTO resumes (user_id, title, selected_template_id, created_at, updated_at)
+        VALUES (?, ?, 1, ?, ?)
+      `)
+      const resumeResult = insertResume.run(userId, `${name}'s Resume`, timestamp, timestamp)
+      const resume = getResumeById(resumeResult.lastInsertRowid)
+
+      const token = generateJwt({ id: user.id, email: user.email, role: user.role })
       return sendJson(res, 201, { user: publicUser(user), resume: publicResume(resume), token })
     }
 
+    // Login User
     if (req.method === 'POST' && pathname === '/api/auth/login') {
       const body = await readBody(req)
-      const user = getUserByEmail(body.email)
-      if (!user || !verifyPassword(body.password || '', user.password_hash)) {
+      const email = String(body.email || '').trim()
+      const password = String(body.password || '')
+
+      if (!email || !password) {
+        return sendError(res, 400, 'Email and password are required')
+      }
+
+      const user = getUserByEmail(email)
+      if (!user || !verifyPassword(password, user.password_hash)) {
         return sendError(res, 401, 'Invalid credentials')
       }
-      const token = createSession(user.id)
+
+      const token = generateJwt({ id: user.id, email: user.email, role: user.role })
       return sendJson(res, 200, { user: publicUser(user), token })
     }
 
+    // Logout User
     if (req.method === 'POST' && pathname === '/api/auth/logout') {
-      const header = req.headers.authorization || ''
-      removeSession(header.startsWith('Bearer ') ? header.slice(7).trim() : null)
+      // JWT is stateless on server, client discards token
       return sendJson(res, 200, { ok: true })
     }
 
+    // Get Active User Profile
     if (req.method === 'GET' && pathname === '/api/me') {
       const user = requireAuth(req, res)
       if (!user) return
       return sendJson(res, 200, { user: publicUser(user) })
     }
 
+    // Get All Users (Admin-only)
     if (req.method === 'GET' && pathname === '/api/users') {
       const user = requireAuth(req, res)
       if (!user || !requireAdmin(user, res)) return
-      return sendJson(res, 200, { users: getUsers().map(publicUser).sort((a, b) => a.id - b.id) })
+      const usersList = db.prepare('SELECT * FROM users ORDER BY id ASC').all()
+      return sendJson(res, 200, { users: usersList.map(publicUser) })
     }
 
+    // Create User (Admin-only)
     if (req.method === 'POST' && pathname === '/api/users') {
       const user = requireAuth(req, res)
       if (!user || !requireAdmin(user, res)) return
@@ -496,142 +458,342 @@ async function handleRequest(req, res) {
       const name = String(body.name || '').trim()
       const email = String(body.email || '').trim()
       const password = String(body.password || '')
-      if (!name || !email || !password) return sendError(res, 400, 'Name, email, and password are required')
-      if (getUserByEmail(email)) return sendError(res, 409, 'Email already registered')
-      return sendJson(res, 201, { user: publicUser(createUserRecord(body)) })
+      const role = body.role === 'admin' ? 'admin' : 'student'
+
+      if (!name || !email || !password) {
+        return sendError(res, 400, 'Name, email, and password are required')
+      }
+      if (!isValidEmail(email)) {
+        return sendError(res, 400, 'Invalid email format')
+      }
+      if (getUserByEmail(email)) {
+        return sendError(res, 409, 'Email already registered')
+      }
+
+      const timestamp = nowIso()
+      const passwordHash = hashPassword(password)
+      const insert = db.prepare(`
+        INSERT INTO users (name, email, role, password_hash, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      const result = insert.run(name, email, role, passwordHash, timestamp, timestamp)
+      const newUser = getUserById(result.lastInsertRowid)
+      return sendJson(res, 201, { user: publicUser(newUser) })
     }
 
     const userDetailMatch = pathname.match(/^\/api\/users\/(\d+)$/)
     const userResumesMatch = pathname.match(/^\/api\/users\/(\d+)\/resumes$/)
 
+    // Get Single User details
     if (userDetailMatch && req.method === 'GET') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const id = Number(userDetailMatch[1])
-      if (!userOwnsRecord(authUser, id)) return sendError(res, 403, 'Forbidden')
-      const user = getUserById(id)
-      if (!user) return sendError(res, 404, 'User not found')
-      return sendJson(res, 200, { user: publicUser(user) })
+      const targetId = Number(userDetailMatch[1])
+      if (!userOwnsRecord(authUser, targetId)) {
+        return sendError(res, 403, 'Forbidden')
+      }
+      const targetUser = getUserById(targetId)
+      if (!targetUser) {
+        return sendError(res, 404, 'User not found')
+      }
+      return sendJson(res, 200, { user: publicUser(targetUser) })
     }
 
+    // Update User Details (Email, name, password)
     if (userDetailMatch && ['PUT', 'PATCH'].includes(req.method)) {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const result = updateUserRecord(Number(userDetailMatch[1]), await readBody(req), authUser)
-      if (result === null) return sendError(res, 404, 'User not found')
-      if (result === 'forbidden') return sendError(res, 403, 'Forbidden')
-      if (result === 'email_conflict') return sendError(res, 409, 'Email already registered')
-      if (result === 'password_invalid') return sendError(res, 401, 'Current password is incorrect')
-      return sendJson(res, 200, { user: publicUser(result) })
+      const targetId = Number(userDetailMatch[1])
+      if (!userOwnsRecord(authUser, targetId)) {
+        return sendError(res, 403, 'Forbidden')
+      }
+
+      const targetUser = getUserById(targetId)
+      if (!targetUser) {
+        return sendError(res, 404, 'User not found')
+      }
+
+      const body = await readBody(req)
+      const name = body.name !== undefined ? String(body.name).trim() || targetUser.name : targetUser.name
+      let email = targetUser.email
+      let role = targetUser.role
+      let passwordHash = targetUser.password_hash
+
+      if (body.email !== undefined) {
+        const nextEmail = String(body.email).trim()
+        if (!isValidEmail(nextEmail)) {
+          return sendError(res, 400, 'Invalid email format')
+        }
+        const conflict = getUserByEmail(nextEmail)
+        if (conflict && conflict.id !== targetId) {
+          return sendError(res, 409, 'Email already registered')
+        }
+        email = nextEmail
+      }
+
+      if (body.role !== undefined && authUser.role === 'admin') {
+        role = body.role === 'admin' ? 'admin' : 'student'
+      }
+
+      if (body.password) {
+        if (authUser.role !== 'admin') {
+          if (!body.currentPassword || !verifyPassword(body.currentPassword, targetUser.password_hash)) {
+            return sendError(res, 401, 'Current password is incorrect')
+          }
+        }
+        if (body.password.length < 6) {
+          return sendError(res, 400, 'Password must be at least 6 characters long')
+        }
+        passwordHash = hashPassword(body.password)
+      }
+
+      const timestamp = nowIso()
+      const update = db.prepare(`
+        UPDATE users 
+        SET name = ?, email = ?, role = ?, password_hash = ?, updated_at = ?
+        WHERE id = ?
+      `)
+      update.run(name, email, role, passwordHash, timestamp, targetId)
+      const updatedUser = getUserById(targetId)
+      return sendJson(res, 200, { user: publicUser(updatedUser) })
     }
 
+    // Delete User details (Admin-only)
     if (userDetailMatch && req.method === 'DELETE') {
       const authUser = requireAuth(req, res)
       if (!authUser || !requireAdmin(authUser, res)) return
-      const id = Number(userDetailMatch[1])
-      if (!getUserById(id)) return sendError(res, 404, 'User not found')
-      deleteUserRecord(id)
+      const targetId = Number(userDetailMatch[1])
+      const exists = getUserById(targetId)
+      if (!exists) {
+        return sendError(res, 404, 'User not found')
+      }
+      db.prepare('DELETE FROM users WHERE id = ?').run(targetId)
       return sendJson(res, 200, { ok: true })
     }
 
+    // Get User Resumes
     if (userResumesMatch && req.method === 'GET') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const id = Number(userResumesMatch[1])
-      if (!userOwnsRecord(authUser, id)) return sendError(res, 403, 'Forbidden')
-      return sendJson(res, 200, { resumes: getResumes().filter(resume => resume.user_id === id).map(publicResume) })
+      const targetUserId = Number(userResumesMatch[1])
+      if (!userOwnsRecord(authUser, targetUserId)) {
+        return sendError(res, 403, 'Forbidden')
+      }
+      const resumesList = db.prepare('SELECT * FROM resumes WHERE user_id = ? ORDER BY id ASC').all(targetUserId)
+      return sendJson(res, 200, { resumes: resumesList.map(publicResume) })
     }
 
+    // Create User Resume
     if (userResumesMatch && req.method === 'POST') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const id = Number(userResumesMatch[1])
-      if (!userOwnsRecord(authUser, id)) return sendError(res, 403, 'Forbidden')
-      if (!getUserById(id)) return sendError(res, 404, 'User not found')
-      const body = await readBody(req)
-      if (!String(body.title || '').trim()) return sendError(res, 400, 'Resume title is required')
-      if (body.selected_template_id && !getTemplateById(body.selected_template_id)) {
-        return sendError(res, 404, 'Template not found')
+      const targetUserId = Number(userResumesMatch[1])
+      if (!userOwnsRecord(authUser, targetUserId)) {
+        return sendError(res, 403, 'Forbidden')
       }
-      return sendJson(res, 201, { resume: publicResume(createResumeRecord(id, body)) })
+      if (!getUserById(targetUserId)) {
+        return sendError(res, 404, 'User not found')
+      }
+
+      const body = await readBody(req)
+      const title = String(body.title || '').trim()
+      if (!title) {
+        return sendError(res, 400, 'Resume title is required')
+      }
+      const selectedTemplateId = body.selected_template_id ? Number(body.selected_template_id) : 1
+
+      const timestamp = nowIso()
+      const contentStr = body.content ? JSON.stringify(body.content) : null
+      const insert = db.prepare(`
+        INSERT INTO resumes (user_id, title, summary, selected_template_id, content, created_at, updated_at)
+        VALUES (?, ?, NULL, ?, ?, ?, ?)
+      `)
+      const result = insert.run(targetUserId, title, selectedTemplateId, contentStr, timestamp, timestamp)
+      const resume = getResumeById(result.lastInsertRowid)
+      return sendJson(res, 201, { resume: publicResume(resume) })
     }
 
+    // Get All Resumes (User-specific or Admin All)
     if (req.method === 'GET' && pathname === '/api/resumes') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const resumes = authUser.role === 'admin'
-        ? getResumes()
-        : getResumes().filter(resume => resume.user_id === authUser.id)
-      return sendJson(res, 200, { resumes: resumes.map(publicResume).sort((a, b) => a.id - b.id) })
+      let resumesList
+      if (authUser.role === 'admin') {
+        resumesList = db.prepare('SELECT * FROM resumes ORDER BY id ASC').all()
+      } else {
+        resumesList = db.prepare('SELECT * FROM resumes WHERE user_id = ? ORDER BY id ASC').all(authUser.id)
+      }
+      return sendJson(res, 200, { resumes: resumesList.map(publicResume) })
     }
 
     const resumeDetailMatch = pathname.match(/^\/api\/resumes\/(\d+)$/)
 
+    // Get Single Resume Details
     if (resumeDetailMatch && req.method === 'GET') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const resume = getResumeById(Number(resumeDetailMatch[1]))
-      if (!resume) return sendError(res, 404, 'Resume not found')
-      if (!userOwnsRecord(authUser, resume.user_id)) return sendError(res, 403, 'Forbidden')
+      const resumeId = Number(resumeDetailMatch[1])
+      const resume = getResumeById(resumeId)
+      if (!resume) {
+        return sendError(res, 404, 'Resume not found')
+      }
+      if (!userOwnsRecord(authUser, resume.user_id)) {
+        return sendError(res, 403, 'Forbidden')
+      }
       return sendJson(res, 200, { resume: publicResume(resume) })
     }
 
+    // Update Resume Details (Title, Template, Summary)
     if (resumeDetailMatch && ['PUT', 'PATCH'].includes(req.method)) {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const result = updateResumeRecord(Number(resumeDetailMatch[1]), await readBody(req), authUser)
-      if (result === null) return sendError(res, 404, 'Resume not found')
-      if (result === 'forbidden') return sendError(res, 403, 'Forbidden')
-      if (result === 'template_not_found') return sendError(res, 404, 'Template not found')
-      return sendJson(res, 200, { resume: publicResume(result) })
+      const resumeId = Number(resumeDetailMatch[1])
+      const resume = getResumeById(resumeId)
+      if (!resume) {
+        return sendError(res, 404, 'Resume not found')
+      }
+      if (!userOwnsRecord(authUser, resume.user_id)) {
+        return sendError(res, 403, 'Forbidden')
+      }
+
+      const body = await readBody(req)
+      const title = body.title !== undefined ? String(body.title).trim() || resume.title : resume.title
+      const summary = body.summary !== undefined ? (body.summary === null ? null : String(body.summary)) : resume.summary
+      const contentStr = body.content !== undefined ? (body.content === null ? null : JSON.stringify(body.content)) : resume.content
+      let selectedTemplateId = resume.selected_template_id
+
+      if (body.selected_template_id !== undefined && body.selected_template_id !== null && body.selected_template_id !== '') {
+        const tid = Number(body.selected_template_id)
+        if (!getTemplateById(tid)) {
+          return sendError(res, 404, 'Template not found')
+        }
+        selectedTemplateId = tid
+      } else if (body.selected_template_id === null || body.selected_template_id === '') {
+        selectedTemplateId = null
+      }
+
+      const timestamp = nowIso()
+      const update = db.prepare(`
+        UPDATE resumes 
+        SET title = ?, summary = ?, selected_template_id = ?, content = ?, updated_at = ?
+        WHERE id = ?
+      `)
+      update.run(title, summary, selectedTemplateId, contentStr, timestamp, resumeId)
+      const updatedResume = getResumeById(resumeId)
+      return sendJson(res, 200, { resume: publicResume(updatedResume) })
     }
 
+    // Delete Resume Details
     if (resumeDetailMatch && req.method === 'DELETE') {
       const authUser = requireAuth(req, res)
       if (!authUser) return
-      const result = deleteResumeRecord(Number(resumeDetailMatch[1]), authUser)
-      if (result === null) return sendError(res, 404, 'Resume not found')
-      if (result === 'forbidden') return sendError(res, 403, 'Forbidden')
+      const resumeId = Number(resumeDetailMatch[1])
+      const resume = getResumeById(resumeId)
+      if (!resume) {
+        return sendError(res, 404, 'Resume not found')
+      }
+      if (!userOwnsRecord(authUser, resume.user_id)) {
+        return sendError(res, 403, 'Forbidden')
+      }
+
+      db.prepare('DELETE FROM resumes WHERE id = ?').run(resumeId)
       return sendJson(res, 200, { ok: true })
     }
 
+    // Get All Templates
     if (req.method === 'GET' && pathname === '/api/templates') {
-      return sendJson(res, 200, { templates: getTemplates().map(publicTemplate).sort((a, b) => a.id - b.id) })
+      const templatesList = db.prepare('SELECT * FROM templates ORDER BY id ASC').all()
+      return sendJson(res, 200, { templates: templatesList.map(publicTemplate) })
     }
 
+    // Create Template (Admin-only)
     if (req.method === 'POST' && pathname === '/api/templates') {
       const user = requireAuth(req, res)
       if (!user || !requireAdmin(user, res)) return
       const body = await readBody(req)
-      if (!String(body.name || '').trim()) return sendError(res, 400, 'Template name is required')
-      return sendJson(res, 201, { template: publicTemplate(createTemplateRecord(body)) })
+      const name = String(body.name || '').trim()
+      if (!name) {
+        return sendError(res, 400, 'Template name is required')
+      }
+
+      const timestamp = nowIso()
+      const rating = Number(body.rating) || 5.0
+      const uses = String(body.uses ?? '0')
+      const layoutType = body.layout_type || 'single-column'
+      const isActive = body.is_active === 0 ? 0 : 1
+      const popular = body.popular ? 1 : 0
+      const isNew = body.new ? 1 : 0
+      const tag = body.tag || 'Modern'
+      const atsReady = body.atsReady ? 1 : 0
+
+      const insert = db.prepare(`
+        INSERT INTO templates (name, description, rating, uses, layout_type, is_active, popular, new, tag, atsReady, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      const result = insert.run(name, body.description || '', rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, timestamp, timestamp)
+      const template = getTemplateById(result.lastInsertRowid)
+      return sendJson(res, 201, { template: publicTemplate(template) })
     }
 
     const templateDetailMatch = pathname.match(/^\/api\/templates\/(\d+)$/)
 
+    // Get Single Template Details
     if (templateDetailMatch && req.method === 'GET') {
-      const template = getTemplates().find(entry => entry.id === Number(templateDetailMatch[1]))
-      if (!template) return sendError(res, 404, 'Template not found')
+      const templateId = Number(templateDetailMatch[1])
+      const template = getTemplateById(templateId)
+      if (!template) {
+        return sendError(res, 404, 'Template not found')
+      }
       return sendJson(res, 200, { template: publicTemplate(template) })
     }
 
+    // Update Template Details (Admin-only)
     if (templateDetailMatch && ['PUT', 'PATCH'].includes(req.method)) {
       const user = requireAuth(req, res)
       if (!user || !requireAdmin(user, res)) return
-      const result = updateTemplateRecord(Number(templateDetailMatch[1]), await readBody(req))
-      if (!result) return sendError(res, 404, 'Template not found')
-      return sendJson(res, 200, { template: publicTemplate(result) })
+      const templateId = Number(templateDetailMatch[1])
+      const template = getTemplateById(templateId)
+      if (!template) {
+        return sendError(res, 404, 'Template not found')
+      }
+
+      const body = await readBody(req)
+      const name = body.name !== undefined ? String(body.name).trim() || template.name : template.name
+      const description = body.description !== undefined ? String(body.description) : template.description
+      const rating = body.rating !== undefined ? Number(body.rating) || 5.0 : template.rating
+      const uses = body.uses !== undefined ? String(body.uses) : template.uses
+      const layoutType = body.layout_type !== undefined ? String(body.layout_type) : template.layout_type
+      const isActive = body.is_active !== undefined ? (Number(body.is_active) === 0 ? 0 : 1) : template.is_active
+      const popular = body.popular !== undefined ? (body.popular ? 1 : 0) : template.popular
+      const isNew = body.new !== undefined ? (body.new ? 1 : 0) : template.new
+      const tag = body.tag !== undefined ? String(body.tag || 'Modern') : template.tag
+      const atsReady = body.atsReady !== undefined ? (body.atsReady ? 1 : 0) : template.atsReady
+
+      const timestamp = nowIso()
+      const update = db.prepare(`
+        UPDATE templates 
+        SET name = ?, description = ?, rating = ?, uses = ?, layout_type = ?, is_active = ?, popular = ?, new = ?, tag = ?, atsReady = ?, updated_at = ?
+        WHERE id = ?
+      `)
+      update.run(name, description, rating, uses, layoutType, isActive, popular, isNew, tag, atsReady, timestamp, templateId)
+      const updatedTemplate = getTemplateById(templateId)
+      return sendJson(res, 200, { template: publicTemplate(updatedTemplate) })
     }
 
+    // Delete Template Details (Admin-only)
     if (templateDetailMatch && req.method === 'DELETE') {
       const user = requireAuth(req, res)
       if (!user || !requireAdmin(user, res)) return
-      if (!deleteTemplateRecord(Number(templateDetailMatch[1]))) {
+      const templateId = Number(templateDetailMatch[1])
+      const exists = getTemplateById(templateId)
+      if (!exists) {
         return sendError(res, 404, 'Template not found')
       }
+      db.prepare('DELETE FROM templates WHERE id = ?').run(templateId)
       return sendJson(res, 200, { ok: true })
     }
 
+    // Default Route not found
     return sendError(res, 404, 'Route not found')
   } catch (error) {
     console.error(error)
@@ -640,5 +802,5 @@ async function handleRequest(req, res) {
 }
 
 http.createServer(handleRequest).listen(PORT, () => {
-  console.log(`JSON API server running on http://localhost:${PORT}`)
+  console.log(`JSON API SQLite server running on http://localhost:${PORT}`)
 })

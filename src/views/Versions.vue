@@ -15,31 +15,37 @@
 
       <!-- Scrollable list of version cards -->
       <div class="versions-scroll-list">
-        <div v-for="ver in filteredVersions" :key="ver.id" class="version-card-row" :class="{ 'selected-border': ver.selected_for_export }" @click="selectVersion(ver.id)">
-          
-          <div class="ver-card-body">
-            <div class="ver-color-icon" :class="'ver-icon-bg-' + ver.template_id">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <template v-if="filteredVersions.length > 0">
+          <div v-for="ver in filteredVersions" :key="ver.id" class="version-card-row" :class="{ 'selected-border': ver.selected_for_export }" @click="selectVersion(ver.id)">
+            
+            <div class="ver-card-body">
+              <div class="ver-color-icon" :class="'ver-icon-bg-' + ver.template_id">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div class="ver-card-details">
+                <div class="ver-card-title">{{ ver.title }}</div>
+                <div class="ver-card-subtitle">{{ getTemplateName(ver.template_id) }} • Last edited {{ ver.last_edited }}</div>
+                <span v-if="ver.selected_for_export" class="badge-selected-text">Selected for export</span>
+              </div>
             </div>
-            <div class="ver-card-details">
-              <div class="ver-card-title">{{ ver.title }}</div>
-              <div class="ver-card-subtitle">{{ getTemplateName(ver.template_id) }} • Last edited {{ ver.last_edited }}</div>
-              <span v-if="ver.selected_for_export" class="badge-selected-text">Selected for export</span>
+
+            <div class="ver-card-actions" @click.stop>
+              <button @click="renamePrompt(ver)" class="small-action-btn" title="Rename">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+              <button @click="duplicateVersion(ver.id)" class="small-action-btn" title="Duplicate">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </button>
+              <button @click="deleteVersion(ver.id)" class="small-action-btn danger-hover" title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              </button>
             </div>
-          </div>
 
-          <div class="ver-card-actions" @click.stop>
-            <button @click="renamePrompt(ver)" class="small-action-btn" title="Rename">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-            </button>
-            <button @click="duplicateVersion(ver.id)" class="small-action-btn" title="Duplicate">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-            </button>
-            <button @click="deleteVersion(ver.id)" class="small-action-btn danger-hover" title="Delete">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            </button>
           </div>
-
+        </template>
+        <div v-else class="no-versions-empty-state">
+          <div class="empty-state-small-icon">📂</div>
+          <span>No versions created yet.</span>
         </div>
       </div>
 
@@ -47,7 +53,7 @@
     </div>
 
     <!-- Right Panel: Export Settings and history logs -->
-    <div class="export-settings-main-container">
+    <div class="export-settings-main-container no-print">
       
       <!-- Export configuration Card -->
       <div class="card export-settings-panel no-print">
@@ -166,7 +172,7 @@
       </div>
 
       <!-- Export History Log Table -->
-      <div class="card history-log-panel">
+      <div class="card history-log-panel no-print">
         <h3 class="widget-title">Export History</h3>
         
         <table class="history-table">
@@ -201,6 +207,11 @@
 
     </div>
 
+    <!-- Hidden container for printing only -->
+    <div class="print-only-resume-container">
+      <ResumePreview />
+    </div>
+
     <!-- Spinner loading Overlay -->
     <div v-if="exporting" class="export-spinner-overlay">
       <div class="spinner-container">
@@ -216,8 +227,13 @@
 <script>
 import { ref, computed } from 'vue'
 import { store } from '@/services/store'
+import ResumePreview from '@/components/resume/ResumePreview.vue'
+import { useResume } from '@/composables/useResume'
 
 export default {
+  components: {
+    ResumePreview
+  },
   setup() {
     const storeState = store.state
     const searchQuery = ref('')
@@ -237,7 +253,7 @@ export default {
     })
 
     const activeVersionTitle = computed(() => {
-      return selectedVersion.value ? selectedVersion.value.title : 'Untitled'
+      return selectedVersion.value ? selectedVersion.value.title : 'No Resume Selected'
     })
 
     const activeTemplateId = computed(() => {
@@ -258,8 +274,8 @@ export default {
       store.selectVersionForExport(id)
     }
 
-    function createNewVersion() {
-      const newVer = store.createNewVersion(`Version #${storeState.versions.length + 1}`)
+    async function createNewVersion() {
+      const newVer = await store.createNewVersion(`Version #${storeState.versions.length + 1}`)
       store.selectVersionForExport(newVer.id)
     }
 
@@ -268,10 +284,6 @@ export default {
     }
 
     function deleteVersion(id) {
-      if (storeState.versions.length <= 1) {
-        alert('You must keep at least one resume version.')
-        return
-      }
       if (confirm('Are you sure you want to delete this resume version?')) {
         store.deleteVersion(id)
       }
@@ -284,23 +296,176 @@ export default {
       }
     }
 
+    function downloadDocx(filename) {
+      const resumeElement = document.getElementById('resume-preview')
+      if (!resumeElement) {
+        alert('Resume preview element not found. Please try again.')
+        return
+      }
+
+      // Get the HTML content
+      const htmlContent = resumeElement.outerHTML
+      const { state: resumeState } = useResume()
+
+      // Define styling specifically for Word
+      const cssStyles = `
+        @page {
+          size: A4;
+          margin: 20mm 20mm 20mm 20mm;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 10pt;
+          line-height: 1.5;
+          color: #333333;
+        }
+        .resume-preview-wrapper {
+          width: 100%;
+        }
+        .resume-preview-container {
+          width: 100%;
+        }
+        .resume-header {
+          background-color: ${resumeState.theme.primaryColor || '#2563eb'};
+          color: #ffffff;
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+        .header-name {
+          font-size: 24pt;
+          font-weight: bold;
+          margin: 0;
+          color: #ffffff;
+        }
+        .header-title {
+          font-size: 14pt;
+          margin-top: 5px;
+          margin-bottom: 10px;
+          color: #ffffff;
+          opacity: 0.9;
+        }
+        .contact-info {
+          font-size: 9.5pt;
+          margin-top: 10px;
+          color: #ffffff;
+          opacity: 0.9;
+        }
+        .contact-info span {
+          margin-right: 15px;
+        }
+        .resume-body {
+          padding: 10px 24px;
+        }
+        .section-title {
+          font-size: 13pt;
+          font-weight: bold;
+          color: ${resumeState.theme.titleColor || '#2563eb'};
+          border-bottom: 2px solid ${resumeState.theme.titleColor || '#2563eb'};
+          padding-bottom: 4px;
+          margin-top: 24px;
+          margin-bottom: 12px;
+          text-transform: uppercase;
+        }
+        .resume-item {
+          margin-bottom: 16px;
+        }
+        .item-header {
+          font-weight: bold;
+          font-size: 10.5pt;
+          margin-bottom: 4px;
+        }
+        .item-subtitle {
+          font-style: italic;
+          font-weight: 500;
+          color: ${resumeState.theme.primaryColor || '#2563eb'};
+          margin-bottom: 6px;
+        }
+        .rich-text-content {
+          font-size: 10pt;
+          color: #334155;
+          margin-top: 4px;
+        }
+        .skills-list {
+          margin-top: 6px;
+        }
+        .skill-badge {
+          display: inline-block;
+          background-color: #f1f5f9;
+          padding: 4px 8px;
+          margin-right: 6px;
+          margin-bottom: 6px;
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          color: #1e293b;
+        }
+      `
+
+      // Wrap in complete Word HTML template
+      const documentSource = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>${activeVersionTitle.value}</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <o:DocumentProperties>
+              <o:Author>MaxCV</o:Author>
+              <o:Template>Normal</o:Template>
+            </o:DocumentProperties>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            ${cssStyles}
+          </style>
+        </head>
+        <body>
+          ${htmlContent}
+        </body>
+        </html>
+      `
+
+      const blob = new Blob(['\ufeff' + documentSource], {
+        type: 'application/msword'
+      })
+
+      // Trigger download
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
     function triggerExport() {
+      if (storeState.versions.length === 0) {
+        alert('You do not have any resumes to export. Please create one first!')
+        return
+      }
       exporting.value = true
       
       // Simulate rendering time
       setTimeout(() => {
         exporting.value = false
         const format = storeState.exportSettings.format
-        const filename = `${activeVersionTitle.value.replace(/\s+/g, '_')}.${format.toLowerCase()}`
+        const ext = format === 'DOCX' ? 'doc' : format.toLowerCase()
+        const filename = `${activeVersionTitle.value.replace(/\s+/g, '_')}.${ext}`
         
         // Log log record
         store.addExportRecord(filename, format)
         
-        // Trigger browser print for PDF
+        // Trigger print or download
         if (format === 'PDF') {
           window.print()
         } else {
-          alert(`Document download started: ${filename}`)
+          downloadDocx(filename)
         }
       }, 1500)
     }
@@ -312,12 +477,20 @@ export default {
         if (item.format === 'PDF') {
           window.print()
         } else {
-          alert(`Document re-download started: ${item.filename}`)
+          let fn = item.filename
+          if (fn.endsWith('.docx')) {
+            fn = fn.substring(0, fn.length - 5) + '.doc'
+          }
+          downloadDocx(fn)
         }
       }, 1000)
     }
 
     function shareLink() {
+      if (!selectedVersion.value) {
+        alert('You do not have any resumes to share. Please create one first!')
+        return
+      }
       const dummyLink = `${window.location.origin}/preview/share-${selectedVersion.value.id}`
       navigator.clipboard.writeText(dummyLink).then(() => {
         alert('Resume link copied to clipboard!')
@@ -818,5 +991,53 @@ input:checked + .slider:before {
 .spinner-container p {
   font-size: 0.78rem;
   color: var(--color-text-muted);
+}
+
+.print-only-resume-container {
+  display: none;
+}
+
+@media print {
+  .versions-page-layout {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  .print-only-resume-container {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* ─── EMPTY STATE FOR VERSIONS ─── */
+.no-versions-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: #fafbfc;
+  color: var(--color-text-muted);
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.empty-state-small-icon {
+  font-size: 1.5rem;
+}
+
+.no-versions-empty-state span {
+  font-size: 0.775rem;
+  font-weight: 600;
 }
 </style>

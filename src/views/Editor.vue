@@ -56,10 +56,10 @@
     </div>
 
     <!-- Right panel: Live preview -->
-    <div class="editor-right-panel no-print">
+    <div class="editor-right-panel">
       
       <!-- Preview Header Bar -->
-      <div class="preview-settings-bar">
+      <div class="preview-settings-bar no-print">
         <div class="settings-left">
           <span class="bar-lbl">Live Preview</span>
         </div>
@@ -79,10 +79,14 @@
       </div>
 
       <!-- Action buttons under Live preview -->
-      <div class="preview-bottom-actions">
+      <div class="preview-bottom-actions no-print">
         <button @click="triggerPrint" class="btn btn-primary flex-grow">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
           Export PDF
+        </button>
+        <button @click="triggerDocxDownload" class="btn btn-success flex-grow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          Export DOCX
         </button>
         <button @click="shareLink" class="btn btn-secondary">
           Share Link
@@ -132,6 +136,156 @@ export default {
       store.addExportRecord(`${resumeState.personal.name || 'Resume'}.pdf`, 'PDF')
     }
 
+    function triggerDocxDownload() {
+      const resumeElement = document.getElementById('resume-preview')
+      if (!resumeElement) {
+        alert('Resume preview element not found. Please try again.')
+        return
+      }
+
+      const name = resumeState.personal.name || 'Resume'
+      const filename = `${name.replace(/\s+/g, '_')}.doc`
+
+      // Define styling specifically for Word
+      const cssStyles = `
+        @page {
+          size: A4;
+          margin: 20mm 20mm 20mm 20mm;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 10pt;
+          line-height: 1.5;
+          color: #333333;
+        }
+        .resume-preview-wrapper {
+          width: 100%;
+        }
+        .resume-preview-container {
+          width: 100%;
+        }
+        .resume-header {
+          background-color: ${resumeState.theme.primaryColor || '#2563eb'};
+          color: #ffffff;
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+        .header-name {
+          font-size: 24pt;
+          font-weight: bold;
+          margin: 0;
+          color: #ffffff;
+        }
+        .header-title {
+          font-size: 14pt;
+          margin-top: 5px;
+          margin-bottom: 10px;
+          color: #ffffff;
+          opacity: 0.9;
+        }
+        .contact-info {
+          font-size: 9.5pt;
+          margin-top: 10px;
+          color: #ffffff;
+          opacity: 0.9;
+        }
+        .contact-info span {
+          margin-right: 15px;
+        }
+        .resume-body {
+          padding: 10px 24px;
+        }
+        .section-title {
+          font-size: 13pt;
+          font-weight: bold;
+          color: ${resumeState.theme.titleColor || '#2563eb'};
+          border-bottom: 2px solid ${resumeState.theme.titleColor || '#2563eb'};
+          padding-bottom: 4px;
+          margin-top: 24px;
+          margin-bottom: 12px;
+          text-transform: uppercase;
+        }
+        .resume-item {
+          margin-bottom: 16px;
+        }
+        .item-header {
+          font-weight: bold;
+          font-size: 10.5pt;
+          margin-bottom: 4px;
+        }
+        .item-subtitle {
+          font-style: italic;
+          font-weight: 500;
+          color: ${resumeState.theme.primaryColor || '#2563eb'};
+          margin-bottom: 6px;
+        }
+        .rich-text-content {
+          font-size: 10pt;
+          color: #334155;
+          margin-top: 4px;
+        }
+        .skills-list {
+          margin-top: 6px;
+        }
+        .skill-badge {
+          display: inline-block;
+          background-color: #f1f5f9;
+          padding: 4px 8px;
+          margin-right: 6px;
+          margin-bottom: 6px;
+          border: 1px solid #cbd5e1;
+          border-radius: 4px;
+          color: #1e293b;
+        }
+      `
+
+      // Wrap in complete Word HTML template
+      const documentSource = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <title>${name}</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <o:DocumentProperties>
+              <o:Author>MaxCV</o:Author>
+              <o:Template>Normal</o:Template>
+            </o:DocumentProperties>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+              <w:DoNotOptimizeForBrowser/>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            ${cssStyles}
+          </style>
+        </head>
+        <body>
+          ${resumeElement.outerHTML}
+        </body>
+        </html>
+      `
+
+      const blob = new Blob(['\ufeff' + documentSource], {
+        type: 'application/msword'
+      })
+
+      // Trigger download
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      // Add to export history in global store
+      store.addExportRecord(filename, 'DOCX')
+    }
+
     function shareLink() {
       const dummyLink = `${window.location.origin}/preview/share-${Date.now()}`
       navigator.clipboard.writeText(dummyLink).then(() => {
@@ -143,6 +297,10 @@ export default {
 
     onMounted(() => {
       store.incrementPreviewSessions()
+      if (store.state.versions.length === 0) {
+        const newVer = store.createNewVersion('My First Resume')
+        store.selectVersionForExport(newVer.id)
+      }
     })
 
     return {
@@ -152,6 +310,7 @@ export default {
       zoomIn,
       zoomOut,
       triggerPrint,
+      triggerDocxDownload,
       shareLink
     }
   }
@@ -398,6 +557,16 @@ export default {
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
 }
 
+.btn-success {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.btn-success:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
 .btn-secondary {
   background: white;
   color: #334155;
@@ -419,8 +588,30 @@ export default {
     display: none !important;
   }
   .editor-page-layout {
-    display: block;
-    height: auto;
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .editor-right-panel {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    background: none !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  .resume-viewport {
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  .resume-print-wrapper {
+    transform: none !important; /* Reset zoom scaling for real A4 printing size */
+    width: 100% !important;
+    height: auto !important;
   }
 }
 
