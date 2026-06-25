@@ -144,13 +144,8 @@
           <div class="settings-preview-aside">
             <span class="preview-lbl">Preview</span>
             <div class="mini-sheet-wrapper">
-              <div class="side-mock-sheet" :class="'mock-bg-' + activeTemplateId">
-                <div class="mock-header" :class="'mock-header-style-' + activeTemplateId"></div>
-                <div class="mock-body-lines">
-                  <div class="mock-line long"></div>
-                  <div class="mock-line medium"></div>
-                  <div class="mock-line short"></div>
-                </div>
+              <div class="mini-preview-container">
+                <ResumePreview :themeOverride="activeTemplate" />
               </div>
             </div>
             <div class="mini-sheet-meta">
@@ -209,7 +204,7 @@
 
     <!-- Hidden container for printing only -->
     <div class="print-only-resume-container">
-      <ResumePreview />
+      <ResumePreview :themeOverride="activeTemplate" />
     </div>
 
     <!-- Spinner loading Overlay -->
@@ -225,7 +220,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { store } from '@/services/store'
 import ResumePreview from '@/components/resume/ResumePreview.vue'
 import { useResume } from '@/composables/useResume'
@@ -238,6 +233,10 @@ export default {
     const storeState = store.state
     const searchQuery = ref('')
     const exporting = ref(false)
+
+    onMounted(async () => {
+      await store.loadTemplates()
+    })
 
     const filteredVersions = computed(() => {
       let list = [...storeState.versions]
@@ -263,6 +262,10 @@ export default {
     const activeTemplateName = computed(() => {
       const t = store.templates.find(x => x.id === activeTemplateId.value)
       return t ? t.name : 'Classic White'
+    })
+
+    const activeTemplate = computed(() => {
+      return store.templates.find(t => t.id === activeTemplateId.value) || null
     })
 
     function getTemplateName(id) {
@@ -513,7 +516,8 @@ export default {
       renamePrompt,
       triggerExport,
       triggerReDownload,
-      shareLink
+      shareLink,
+      activeTemplate
     }
   }
 }
@@ -601,6 +605,7 @@ export default {
   align-items: center;
   gap: 0.625rem;
   flex: 1;
+  min-width: 0;
 }
 
 .ver-color-icon {
@@ -611,6 +616,7 @@ export default {
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
 }
 
 .ver-icon-bg-1 { background-color: var(--color-primary); }
@@ -623,13 +629,14 @@ export default {
 .ver-card-details {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .ver-card-title {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-text-main);
-  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -638,6 +645,9 @@ export default {
 .ver-card-subtitle {
   font-size: 0.68rem;
   color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge-selected-text {
@@ -650,30 +660,34 @@ export default {
 .ver-card-actions {
   display: flex;
   gap: 0.25rem;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .small-action-btn {
-  background: white;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-light);
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .small-action-btn:hover {
   color: var(--color-primary);
-  border-color: var(--color-primary);
+  border-color: var(--color-primary-light);
+  background-color: var(--color-primary-light);
 }
 
 .small-action-btn.danger-hover:hover {
   color: var(--color-danger);
-  border-color: var(--color-danger);
+  border-color: var(--color-danger-light);
   background-color: var(--color-danger-light);
 }
 
@@ -858,11 +872,33 @@ input:checked + .slider:before {
 }
 
 .mini-sheet-wrapper {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
+  width: 180px;
+  height: 256px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 0.75rem;
+}
+
+.mini-preview-container {
+  width: 210mm;
+  height: 297mm;
+  transform: scale(0.21);
+  transform-origin: center center;
+  position: absolute;
+  pointer-events: none;
+  background: white;
+}
+
+.mini-preview-container :deep(.a4-page) {
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .mini-sheet-meta {
